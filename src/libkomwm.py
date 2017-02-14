@@ -345,6 +345,10 @@ def komap_mapswithme(options):
                             dr_line.join = dr_linejoins.get(st.get('casing-linejoin', 'round'), ROUNDJOIN)
                             dr_element.lines.extend([dr_line])
 
+                        if ('fill-color' in st) and (float(st.get('fill-opacity', 1)) > 0):
+                            dr_element.area.border.color = mwm_encode_color(colors, st, "casing")
+                            dr_element.area.border.width = st.get('casing-width', 0) * WIDTH_SCALE
+                            
                         # Let's try without this additional line style overhead. Needed only for casing in road endings.
                         # if st.get('casing-linecap', st.get('linecap', 'round')) != 'butt':
                         #     dr_line = LineRuleProto()
