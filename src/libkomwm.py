@@ -487,8 +487,6 @@ def komap_mapswithme(options):
                 if str_dr_element not in all_draw_elements:
                     all_draw_elements.add(str_dr_element)
                     dr_cont.element.extend([dr_element])
-                else:
-                    print("Prevented from adding a duplicate ")
 
     if dr_cont is not None:
         if dr_cont.element:
