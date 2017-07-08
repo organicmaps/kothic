@@ -454,6 +454,8 @@ def komap_mapswithme(options):
                                 is_valid, value = to_boolean(sp.get('text-optional', ''))
                                 if is_valid:
                                     dr_cur_subtext.is_optional = value
+                                else:
+                                    dr_cur_subtext.is_optional = True
                             has_text.pop()
                         if '-x-me-text-priority' in st:
                             dr_text.priority = int(st.get('-x-me-text-priority'))
