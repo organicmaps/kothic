@@ -214,8 +214,7 @@ def komap_mapswithme(options):
     mapcss_static_tags = {}
     for v in classificator.values():
         for i, t in enumerate(v.keys()):
-            # Exception for "sport=*" since these are both main and secondary keys.
-            mapcss_static_tags[t] = i == 0 and t != 'sport'
+            mapcss_static_tags[t] = mapcss_static_tags.get(t, True) and i == 0
 
     # Get all mapcss dynamic tags from mapcss-dynamic.txt
     mapcss_dynamic_tags = set([line.rstrip() for line in open(os.path.join(ddir, 'mapcss-dynamic.txt'))])
