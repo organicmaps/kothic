@@ -79,9 +79,9 @@ class Condition:
         if t == 'eq':
             return "%s=%s" % (params[0], params[1])
         if t == 'ne':
-            return "%s=%s" % (params[0], params[1])
+            return "%s!=%s" % (params[0], params[1])
         if t == 'regex':
-            return "%s=~/%s/" % (params[0], params[1]);
+            return "%s=~/%s/" % (params[0], params[1])
         if t == 'true':
             return "%s?" % (params[0])
         if t == 'untrue':

@@ -5,6 +5,7 @@ import csv
 import sys
 import itertools
 from multiprocessing import Pool
+from collections import OrderedDict
 import mapcss.webcolors
 whatever_to_hex = mapcss.webcolors.webcolors.whatever_to_hex
 whatever_to_cairo = mapcss.webcolors.webcolors.whatever_to_cairo
@@ -183,7 +184,7 @@ def komap_mapswithme(options):
         if cl in unique_types_check and row[2] != 'x':
             raise Exception('Duplicate type: {0}'.format(row[0]))
         pairs = [i.strip(']').split("=") for i in row[1].split(',')[0].split('[')]
-        kv = {}
+        kv = OrderedDict()
         for i in pairs:
             if len(i) == 1:
                 if i[0]:
@@ -209,10 +210,11 @@ def komap_mapswithme(options):
     types_file.close()
 
     # Get all mapcss static tags which are used in mapcss-mapping.csv
-    mapcss_static_tags = set()
+    # This is a dict with main_tag flags (True = appears first in types)
+    mapcss_static_tags = {}
     for v in classificator.values():
-        for t in v.keys():
-            mapcss_static_tags.add(t)
+        for i, t in enumerate(v.keys()):
+            mapcss_static_tags[t] = mapcss_static_tags.get(t, True) and i == 0
 
     # Get all mapcss dynamic tags from mapcss-dynamic.txt
     mapcss_dynamic_tags = set([line.rstrip() for line in open(os.path.join(ddir, 'mapcss-dynamic.txt'))])
@@ -220,7 +222,8 @@ def komap_mapswithme(options):
     # Parse style mapcss
     global style
     style = MapCSS(options.minzoom, options.maxzoom + 1)
-    style.parse(filename = options.filename, static_tags = mapcss_static_tags, dynamic_tags = mapcss_dynamic_tags)
+    style.parse(filename=options.filename, static_tags=mapcss_static_tags,
+                dynamic_tags=mapcss_dynamic_tags)
 
     # Build optimization tree - class/type -> StyleChoosers
     for cl in class_order:
