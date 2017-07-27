@@ -194,7 +194,7 @@ class MapCSS():
             raise Exception("Variable not found: " + str(format(name)))
         return self.variables[name] if name in self.variables else m.group()
 
-    def parse(self, css=None, clamp=True, stretch=1000, filename=None, static_tags=set(), dynamic_tags=set()):
+    def parse(self, css=None, clamp=True, stretch=1000, filename=None, static_tags={}, dynamic_tags=set()):
         """
         Parses MapCSS given as string
         """
@@ -254,6 +254,7 @@ class MapCSS():
                     elif GROUP.match(css):
                         css = GROUP.sub("", css, 1)
                         sc.newGroup()
+                        had_main_tag = False
                         previous = oGROUP
 
                     # Condition - [highway=primary] or [population>1000]
@@ -261,14 +262,26 @@ class MapCSS():
                         if (previous == oDECLARATION):
                             self.choosers.append(sc)
                             sc = StyleChooser(self.scalepair)
+                            had_main_tag = False
                         if (previous != oOBJECT) and (previous != oZOOM) and (previous != oCONDITION):
                             sc.newObject()
+                            had_main_tag = False
                         cond = CONDITION.match(css).groups()[0]
-                        log.debug("condition found: %s" % (cond))
                         c = parseCondition(cond)
                         tag = c.extract_tag()
-                        if tag == "*" or tag in static_tags:
-                            sc.addCondition(c)
+                        tag_type = static_tags.get(tag, None)
+                        if tag == "*" or tag_type is not None:
+                            if tag_type and had_main_tag:
+                                if '!' in cond:
+                                    condType = 'ne'
+                                    cond = cond.replace('!', '')
+                                else:
+                                    condType = 'eq'
+                                sc.addRuntimeCondition(Condition(condType, ('extra_tag', cond)))
+                            else:
+                                sc.addCondition(c)
+                                if tag_type:
+                                    had_main_tag = True
                         elif tag in dynamic_tags:
                             sc.addRuntimeCondition(c)
                         else:
@@ -285,6 +298,7 @@ class MapCSS():
                         log.debug("object found: %s" % (obj))
                         css = OBJECT.sub("", css, 1)
                         sc.newObject(obj)
+                        had_main_tag = False
                         previous = oOBJECT
 
                     # Declaration - {...}
