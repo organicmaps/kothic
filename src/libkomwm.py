@@ -194,8 +194,8 @@ def komap_mapswithme(options):
                         kv[i[0].strip('?')] = "yes"
             else:
                 kv[i[0]] = i[1]
-        classificator[cl] = kv
         if row[2] != "x":
+            classificator[cl] = kv
             class_order.append(cl)
             unique_types_check.add(cl)
             print >> types_file, row[0]
