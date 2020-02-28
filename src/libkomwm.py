@@ -198,7 +198,8 @@ def komap_mapswithme(options):
             classificator[cl] = kv
             class_order.append(cl)
             unique_types_check.add(cl)
-            print >> types_file, row[0]
+            # Mark original type to distinguish it among replacing types.
+            print >> types_file, "*" + row[0]
         else:
             # compatibility mode
             if row[6]:
