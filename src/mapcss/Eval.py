@@ -44,8 +44,11 @@ class Eval():
 
         # print self.expr_text
         tags = set([])
+        def tags_add(x):
+            tags.add(x)
+            return 0
         a = eval(self.expr, {}, {
-                 "tag": lambda x: max([tags.add(x), 0]),
+                 "tag": lambda x: tags_add(x),
                  "prop": lambda x: 0,
                  "num": lambda x: 0,
                  "metric": fake_compute,
@@ -176,6 +179,6 @@ def m_metric(x, t):
 
 if __name__ == "__main__":
     a = Eval(""" eval( any( metric(tag("height")), metric ( num(tag("building:levels")) * 3), metric("1m"))) """)
-    print repr(a)
-    print a.compute({"building:levels": "3"})
-    print a.extract_tags()
+    print(repr(a))
+    print(a.compute({"building:levels": "3"}))
+    print(a.extract_tags())

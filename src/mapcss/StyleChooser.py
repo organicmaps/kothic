@@ -16,17 +16,17 @@
 #   along with kothic.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from Rule import Rule
-from webcolors.webcolors import whatever_to_cairo as colorparser
-from webcolors.webcolors import cairo_to_hex
-from Eval import Eval
-from Condition import  *
+from .Rule import Rule
+from .webcolors.webcolors import whatever_to_cairo as colorparser
+from .webcolors.webcolors import cairo_to_hex
+from .Eval import Eval
+from .Condition import  *
 
 TYPE_EVAL = type(Eval())
 
 def make_nice_style(r):
     ra = {}
-    for a, b in r.iteritems():
+    for a, b in r.items():
         "checking and nicifying style table"
         if type(b) == TYPE_EVAL:
             ra[a] = b
@@ -101,7 +101,7 @@ class StyleChooser:
                 break
         if self.has_evals and "*" not in a:
             for s in self.styles:
-                for v in s.values():
+                for v in list(s.values()):
                     if type(v) == self.eval_type:
                         a.update(v.extract_tags())
         if "*" in a or len(a) == 0:
@@ -165,13 +165,13 @@ class StyleChooser:
         for r in self.styles:
             if self.has_evals:
                 ra = {}
-                for a, b in r.iteritems():
+                for a, b in r.items():
                     "calculating eval()'s"
                     if type(b) == self.eval_type:
                         combined_style = {}
                         for t in sl:
                             combined_style.update(t)
-                        for p, q in combined_style.iteritems():
+                        for p, q in combined_style.items():
                             if "color" in p:
                                 combined_style[p] = cairo_to_hex(q)
                         b = b.compute(tags, combined_style, xscale, zscale)
@@ -267,7 +267,7 @@ class StyleChooser:
         rb = []
         for r in a:
             ra = {}
-            for a, b in r.iteritems():
+            for a, b in r.items():
                 a = a.strip()
                 b = b.strip()
                 if a == "casing-width":

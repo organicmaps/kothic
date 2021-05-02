@@ -18,8 +18,8 @@
 import re
 import os
 import logging
-from StyleChooser import StyleChooser
-from Condition import Condition
+from .StyleChooser import StyleChooser
+from .Condition import Condition
 
 
 NEEDED_KEYS = set(["width", "casing-width", "fill-color", "fill-image", "icon-image", "text", "extrude",
@@ -127,7 +127,7 @@ class MapCSS():
 
     def restore_choosers_order(self, type):
         ethalon_choosers = self.choosers_by_type[type]
-        for tag, choosers_for_tag in self.choosers_by_type_and_tag[type].items():
+        for tag, choosers_for_tag in list(self.choosers_by_type_and_tag[type].items()):
             tmp = []
             for ec in ethalon_choosers:
                 if ec in choosers_for_tag:
