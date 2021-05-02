@@ -103,6 +103,9 @@ class Condition:
     def __eq__(self, a):
         return (self.params == a.params) and (self.type == a.type)
 
+    def __lt__(self, a):
+        return (self.params < a.params) or (self.type < a.type)
+
 def Number(tt):
     """
     Wrap float() not to produce exceptions

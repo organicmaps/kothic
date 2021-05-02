@@ -4,6 +4,7 @@ import os
 import csv
 import sys
 import itertools
+import functools
 from multiprocessing import Pool
 from collections import OrderedDict
 import mapcss.webcolors
@@ -69,7 +70,7 @@ def query_style(args):
     cltags["addr:flats"] = "addr:flats"
 
     results = []
-    for zoom in xrange(minzoom, maxzoom + 1):
+    for zoom in range(minzoom, maxzoom + 1):
         runtime_conditions_arr = []
 
         # Get runtime conditions which are used for class 'cl' on zoom 'zoom'
@@ -92,7 +93,7 @@ def query_style(args):
                 linestyle = style.get_style_dict(clname, "line", cltags, zoom, olddict=zstyle, filter_by_runtime_conditions=runtime_conditions)
                 zstyle = linestyle
             areastyle = style.get_style_dict(clname, "area", cltags, zoom, olddict=zstyle, filter_by_runtime_conditions=runtime_conditions)
-            for st in areastyle.values():
+            for st in list(areastyle.values()):
                 if "icon-image" in st or 'symbol-shape' in st or 'symbol-image' in st:
                     has_icons_for_areas = True
                     break
@@ -101,7 +102,7 @@ def query_style(args):
                 nodestyle = style.get_style_dict(clname, "node", cltags, zoom, olddict=zstyle, filter_by_runtime_conditions=runtime_conditions)
                 zstyle = nodestyle
 
-            results.append((cl, zoom, has_icons_for_areas, runtime_conditions, zstyle.values()))
+            results.append((cl, zoom, has_icons_for_areas, runtime_conditions, list(zstyle.values())))
     return results
 
 
@@ -176,7 +177,7 @@ def komap_mapswithme(options):
         if int(row[5]) < cnt:
             raise Exception('Wrong type id: {0}'.format(';'.join(row)))
         while int(row[5]) > cnt:
-            print >> types_file, "mapswithme"
+            print("mapswithme", file=types_file)
             cnt += 1
         cnt += 1
 
@@ -199,13 +200,13 @@ def komap_mapswithme(options):
             class_order.append(cl)
             unique_types_check.add(cl)
             # Mark original type to distinguish it among replacing types.
-            print >> types_file, "*" + row[0]
+            print("*" + row[0], file=types_file)
         else:
             # compatibility mode
             if row[6]:
-                print >> types_file, row[6]
+                print(row[6], file=types_file)
             else:
-                print >> types_file, "mapswithme"
+                print("mapswithme", file=types_file)
         class_tree[cl] = row[0]
     class_order.sort()
     types_file.close()
@@ -213,7 +214,7 @@ def komap_mapswithme(options):
     # Get all mapcss static tags which are used in mapcss-mapping.csv
     # This is a dict with main_tag flags (True = appears first in types)
     mapcss_static_tags = {}
-    for v in classificator.values():
+    for v in list(classificator.values()):
         for i, t in enumerate(v.keys()):
             mapcss_static_tags[t] = mapcss_static_tags.get(t, True) and i == 0
 
@@ -242,7 +243,7 @@ def komap_mapswithme(options):
     raw_style_colors = style.get_colors()
     if raw_style_colors is not None:
         unique_style_colors = set()
-        for k in raw_style_colors.keys():
+        for k in list(raw_style_colors.keys()):
             unique_style_colors.add(k[:k.rindex('-')])
         for k in unique_style_colors:
             style_colors[k] = mwm_encode_color(colors, raw_style_colors, k)
@@ -265,7 +266,7 @@ def komap_mapswithme(options):
         imapfunc = itertools.imap
 
     if style_colors:
-        for k, v in style_colors.iteritems():
+        for k, v in style_colors.items():
             color_proto = ColorElementProto()
             color_proto.name = k
             color_proto.color = v
@@ -298,7 +299,7 @@ def komap_mapswithme(options):
                 has_icons = False
                 has_fills = False
                 for st in zstyle:
-                    st = dict([(k, v) for k, v in st.iteritems() if str(v).strip(" 0.")])
+                    st = dict([(k, v) for k, v in st.items() if str(v).strip(" 0.")])
                     if 'width' in st or 'pattern-image' in st:
                         has_lines = True
                     if 'icon-image' in st or 'symbol-shape' in st or 'symbol-image' in st:
@@ -508,17 +509,17 @@ def komap_mapswithme(options):
 
     if options.txt:
         drules_txt = open(os.path.join(options.outfile + '.txt'), "wb")
-        drules_txt.write(unicode(drules))
+        drules_txt.write(str(drules).encode())
         drules_txt.close()
 
     # Write classificator.txt and visibility.txt files
 
     visnodes = set()
-    for k, v in visibility.iteritems():
+    for k, v in visibility.items():
         vis = k.split("|")
         for i in range(1, len(vis) - 1):
             visnodes.add("|".join(vis[0:i]) + "|")
-    viskeys = list(set(visibility.keys() + list(visnodes)))
+    viskeys = list(set(list(visibility.keys()) + list(visnodes)))
 
     def cmprepl(a, b):
         if a == b:
@@ -528,7 +529,7 @@ def komap_mapswithme(options):
         if a > b:
             return 1
         return -1
-    viskeys.sort(cmprepl)
+    viskeys.sort(key=functools.cmp_to_key(cmprepl))
 
     visibility_file = open(os.path.join(ddir, 'visibility.txt'), "w")
     classificator_file = open(os.path.join(ddir, 'classificator.txt'), "w")
@@ -536,18 +537,18 @@ def komap_mapswithme(options):
     oldoffset = ""
     for k in viskeys:
         offset = "    " * (k.count("|") - 1)
-        for i in range(len(oldoffset) / 4, len(offset) / 4, -1):
-            print >> visibility_file, "    " * i + "{}"
-            print >> classificator_file, "    " * i + "{}"
+        for i in range(int(len(oldoffset) / 4), int(len(offset) / 4), -1):
+            print("    " * i + "{}", file=visibility_file)
+            print("    " * i + "{}", file=classificator_file)
         oldoffset = offset
         end = "-"
         if k in visnodes:
             end = "+"
-        print >> visibility_file, offset + k.split("|")[-2] + "  " + visibility.get(k, "0" * (options.maxzoom + 1)) + "  " + end
-        print >> classificator_file, offset + k.split("|")[-2] + "  " + end
-    for i in range(len(offset) / 4, 0, -1):
-        print >> visibility_file, "    " * i + "{}"
-        print >> classificator_file, "    " * i + "{}"
+        print(offset + k.split("|")[-2] + "  " + visibility.get(k, "0" * (options.maxzoom + 1)) + "  " + end, file=visibility_file)
+        print(offset + k.split("|")[-2] + "  " + end, file=classificator_file)
+    for i in range(int(len(offset) / 4), 0, -1):
+        print("    " * i + "{}", file=visibility_file)
+        print("    " * i + "{}", file=classificator_file)
 
     visibility_file.close()
     classificator_file.close()
