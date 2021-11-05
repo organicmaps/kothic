@@ -353,7 +353,7 @@ def komap_mapswithme(options):
                         if has_fills and 'fill-color' in st and float(st.get('fill-opacity', 1)) > 0:
                             dr_element.area.border.color = mwm_encode_color(colors, st, "casing")
                             dr_element.area.border.width = st.get('casing-width', 0) * WIDTH_SCALE
-                            
+
                         # Let's try without this additional line style overhead. Needed only for casing in road endings.
                         # if st.get('casing-linecap', st.get('linecap', 'round')) != 'butt':
                         #     dr_line = LineRuleProto()
@@ -462,10 +462,15 @@ def komap_mapswithme(options):
                                 else:
                                     dr_cur_subtext.is_optional = True
                             has_text.pop()
+
                         if '-x-me-text-priority' in st:
                             dr_text.priority = int(st.get('-x-me-text-priority'))
                         else:
                             dr_text.priority = min(19000, (base_z + int(st.get('z-index', 0))))
+                        if '-x-me-min-text-priority' in st:
+                            min_priority = int(st.get('-x-me-min-text-priority'))
+                            dr_text.priority = max(min_priority, dr_text.priority)
+
                         has_text = None
 
                     if has_fills:
