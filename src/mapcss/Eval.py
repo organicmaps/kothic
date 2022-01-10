@@ -72,7 +72,7 @@ class Eval():
                 pass
         """
         try:
-            return str(eval(self.expr, {}, {
+            result = eval(self.expr, {}, {
                             "tag": lambda x: tags.get(x, ""),
                             "prop": lambda x: props.get(x, ""),
                             "num": m_num,
@@ -84,7 +84,20 @@ class Eval():
                             "max": m_max,
                             "cond": m_cond,
                             "boolean": m_boolean
-                            }))
+                            })
+            if type(result) == float:
+                # In Python2 and Python3 float to string behaves differently
+                # Python 2:
+                #   >>> str(2.8 + 0.4)
+                #   '3.2'
+                # Python 3:
+                #   >>> str(2.8 + 0.4)
+                #   '3.1999999999999997'
+                #
+                # See https://stackoverflow.com/q/25898733 for details
+                return "{:.4g}".format(result)
+
+            return str(result)
         except:
             return ""
 

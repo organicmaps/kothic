@@ -3,11 +3,11 @@ from optparse import OptionParser
 import os
 import csv
 import sys
-import itertools
 import functools
-from multiprocessing import Pool
+from multiprocessing import Pool, set_start_method
 from collections import OrderedDict
 import mapcss.webcolors
+
 whatever_to_hex = mapcss.webcolors.webcolors.whatever_to_hex
 whatever_to_cairo = mapcss.webcolors.webcolors.whatever_to_cairo
 
@@ -37,6 +37,7 @@ def to_boolean(s):
     else:
         return False, False # Invalid
 
+
 def mwm_encode_color(colors, st, prefix='', default='black'):
     if prefix:
         prefix += "-"
@@ -45,6 +46,7 @@ def mwm_encode_color(colors, st, prefix='', default='black'):
     result = int(opacity + color, 16)
     colors.add(result)
     return result
+
 
 def mwm_encode_image(st, prefix='icon', bgprefix='symbol'):
     if prefix:
@@ -59,8 +61,9 @@ def mwm_encode_image(st, prefix='icon', bgprefix='symbol'):
 
 
 def query_style(args):
+    global style
     cl, cltags, minzoom, maxzoom = args
-    clname = cl if cl.find('-') == -1 else cl[:cl.find('-')]
+    clname = cl.partition("-")[0]
 
     cltags["name"] = "name"
     cltags["addr:housenumber"] = "addr:housenumber"
@@ -86,7 +89,7 @@ def query_style(args):
 
         for runtime_conditions in runtime_conditions_arr:
             has_icons_for_areas = False
-            zstyle = {}
+            zstyle = OrderedDict()
 
             # Get style for class 'cl' on zoom 'zoom' with corresponding runtime conditions
             if "area" not in cltags:
@@ -102,7 +105,9 @@ def query_style(args):
                 nodestyle = style.get_style_dict(clname, "node", cltags, zoom, olddict=zstyle, filter_by_runtime_conditions=runtime_conditions)
                 zstyle = nodestyle
 
-            results.append((cl, zoom, has_icons_for_areas, runtime_conditions, list(zstyle.values())))
+            zstyle = list(zstyle.values())
+            zstyle.reverse()
+            results.append((cl, zoom, has_icons_for_areas, runtime_conditions, zstyle))
     return results
 
 
@@ -125,6 +130,7 @@ def komap_mapswithme(options):
         colors_in_file.close()
 
     patterns = []
+
     def addPattern(dashes):
         if dashes and dashes not in patterns:
             patterns.append(dashes)
@@ -260,10 +266,11 @@ def komap_mapswithme(options):
     drules = ContainerProto()
     dr_cont = None
     if MULTIPROCESSING:
+        set_start_method('fork')  # Use fork with multiprocessing to share global variables among Python instances
         pool = Pool()
         imapfunc = pool.imap
     else:
-        imapfunc = itertools.imap
+        imapfunc = map
 
     if style_colors:
         for k, v in style_colors.items():
@@ -273,6 +280,7 @@ def komap_mapswithme(options):
             color_proto.x = 0
             color_proto.y = 0
             drules.colors.value.extend([color_proto])
+        drules.colors.value.sort(key=lambda color: color.name)
 
     all_draw_elements = set()
 
@@ -294,6 +302,9 @@ def komap_mapswithme(options):
 
                 if len(zstyle) == 0:
                     continue
+
+                if len(zstyle) == 2 and zstyle[1].get("object-id") == "::default":
+                    zstyle.reverse()  # Make sure primary style goes first
 
                 has_lines = False
                 has_icons = False
@@ -353,7 +364,7 @@ def komap_mapswithme(options):
                         if has_fills and 'fill-color' in st and float(st.get('fill-opacity', 1)) > 0:
                             dr_element.area.border.color = mwm_encode_color(colors, st, "casing")
                             dr_element.area.border.width = st.get('casing-width', 0) * WIDTH_SCALE
-                            
+
                         # Let's try without this additional line style overhead. Needed only for casing in road endings.
                         # if st.get('casing-linecap', st.get('linecap', 'round')) != 'butt':
                         #     dr_line = LineRuleProto()
@@ -491,6 +502,8 @@ def komap_mapswithme(options):
                             has_fills = False
 
                 str_dr_element = dr_cont.name + "/" + str(dr_element)
+                dr_element.lines.sort(key=lambda x: x.priority)
+
                 if str_dr_element not in all_draw_elements:
                     all_draw_elements.add(str_dr_element)
                     dr_cont.element.extend([dr_element])
@@ -529,6 +542,7 @@ def komap_mapswithme(options):
         if a > b:
             return 1
         return -1
+
     viskeys.sort(key=functools.cmp_to_key(cmprepl))
 
     visibility_file = open(os.path.join(ddir, 'visibility.txt'), "w")
@@ -588,6 +602,7 @@ def main():
         parser.error("Please specify base output path.")
 
     komap_mapswithme(options)
+
 
 if __name__ == '__main__':
     if PROFILE:

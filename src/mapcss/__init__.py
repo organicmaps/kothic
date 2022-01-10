@@ -170,12 +170,12 @@ class MapCSS():
             return colors[0].styles[0]
         return None
 
-    def get_style_dict(self, clname, type, tags={}, zoom=0, xscale=1, zscale=.5, olddict={}, filter_by_runtime_conditions=None):
+    def get_style_dict(self, clname, type, tags={}, zoom=0, xscale=1, zscale=.5, olddict=None, filter_by_runtime_conditions=None):
         """
         Kothic styling API
         """
         r = self.get_style(clname, type, tags, zoom, xscale, zscale, filter_by_runtime_conditions)
-        d = olddict
+        d = olddict or dict()
         for x in r:
             if x.get('object-id', '') not in d:
                 d[x.get('object-id', '')] = {}
