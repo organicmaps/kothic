@@ -3,11 +3,11 @@ from optparse import OptionParser
 import os
 import csv
 import sys
-import itertools
 import functools
-from multiprocessing import Pool
+from multiprocessing import Pool, set_start_method
 from collections import OrderedDict
 import mapcss.webcolors
+
 whatever_to_hex = mapcss.webcolors.webcolors.whatever_to_hex
 whatever_to_cairo = mapcss.webcolors.webcolors.whatever_to_cairo
 
@@ -59,6 +59,7 @@ def mwm_encode_image(st, prefix='icon', bgprefix='symbol'):
 
 
 def query_style(args):
+    global style
     cl, cltags, minzoom, maxzoom = args
     clname = cl if cl.find('-') == -1 else cl[:cl.find('-')]
 
@@ -260,13 +261,14 @@ def komap_mapswithme(options):
     drules = ContainerProto()
     dr_cont = None
     if MULTIPROCESSING:
+        set_start_method('fork')  # Use fork with multiprocessing to share global variables among Python instances
         pool = Pool()
         imapfunc = pool.imap
     else:
-        imapfunc = itertools.imap
+        imapfunc = map
 
     if style_colors:
-        for k, v in style_colors.items():
+        for k, v in sorted(list(style_colors.items())):
             color_proto = ColorElementProto()
             color_proto.name = k
             color_proto.color = v
@@ -279,6 +281,24 @@ def komap_mapswithme(options):
     for results in imapfunc(query_style, ((cl, classificator[cl], options.minzoom, options.maxzoom) for cl in class_order)):
         for result in results:
                 cl, zoom, has_icons_for_areas, runtime_conditions, zstyle = result
+
+                # First, sort rules by 'object-id' in captions (primary, secondary, none ..);
+                # Then by 'z-index' in ascending order.
+                def rule_sort_key(dict_):
+                    first = 0
+                    if dict_.get('text'):
+                        if str(dict_.get('object-id')) != '::default':
+                            first = 1
+                        if str(dict_.get('text')) == 'none':
+                            first = 2
+                    return (first, int(dict_.get('z-index', 0)))
+
+                zstyle.sort(key = rule_sort_key)
+
+                # For debug purpose.
+                # if str(cl) == 'entrance' and int(zoom) == 19:
+                #     print(cl)
+                #     print(zstyle)
 
                 if dr_cont is not None and dr_cont.name != cl:
                     if dr_cont.element:
@@ -353,7 +373,7 @@ def komap_mapswithme(options):
                         if has_fills and 'fill-color' in st and float(st.get('fill-opacity', 1)) > 0:
                             dr_element.area.border.color = mwm_encode_color(colors, st, "casing")
                             dr_element.area.border.width = st.get('casing-width', 0) * WIDTH_SCALE
-                            
+
                         # Let's try without this additional line style overhead. Needed only for casing in road endings.
                         # if st.get('casing-linecap', st.get('linecap', 'round')) != 'butt':
                         #     dr_line = LineRuleProto()
@@ -432,19 +452,17 @@ def komap_mapswithme(options):
                             has_icons = False
 
                     if has_text and st.get('text') and st.get('text') != 'none':
+                        # Take only first 2 captions: primary, secondary.
                         has_text = has_text[:2]
-                        has_text.reverse()
-                        dr_text = dr_element.path_text
+
+                        dr_text = dr_element.caption
                         base_z = 15000
                         if st.get('text-position', 'center') == 'line':
                             dr_text = dr_element.path_text
                             base_z = 16000
-                        else:
-                            dr_text = dr_element.caption
-                        for sp in has_text[:]:
-                            dr_cur_subtext = dr_text.primary
-                            if len(has_text) == 2:
-                                dr_cur_subtext = dr_text.secondary
+
+                        dr_cur_subtext = dr_text.primary
+                        for sp in has_text:
                             dr_cur_subtext.height = int(float(sp.get('font-size', "10").split(",")[0]))
                             dr_cur_subtext.color = mwm_encode_color(colors, sp, "text")
                             if st.get('text-halo-radius', 0) != 0:
@@ -461,11 +479,18 @@ def komap_mapswithme(options):
                                     dr_cur_subtext.is_optional = value
                                 else:
                                     dr_cur_subtext.is_optional = True
-                            has_text.pop()
+                            dr_cur_subtext = dr_text.secondary
+
+                        #  Priority is assigned from the first (primary) rule.
                         if '-x-me-text-priority' in st:
                             dr_text.priority = int(st.get('-x-me-text-priority'))
                         else:
                             dr_text.priority = min(19000, (base_z + int(st.get('z-index', 0))))
+                        if '-x-me-min-text-priority' in st:
+                            min_priority = int(st.get('-x-me-min-text-priority'))
+                            dr_text.priority = max(min_priority, dr_text.priority)
+
+                        # Process captions block once.
                         has_text = None
 
                     if has_fills:
