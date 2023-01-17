@@ -296,7 +296,7 @@ def komap_mapswithme(options):
                 zstyle.sort(key = rule_sort_key)
 
                 # For debug purpose.
-                # if str(cl) == 'entrance' and int(zoom) == 19:
+                # if str(cl) == 'highway-path' and int(zoom) == 19:
                 #     print(cl)
                 #     print(zstyle)
 
@@ -354,11 +354,23 @@ def komap_mapswithme(options):
                     elif st.get('-x-kot-layer') == 'bottom':
                         st['z-index'] = float(st.get('z-index', 0)) - 15001.
 
-                    if st.get('casing-width') not in (None, 0):  # and (st.get('width') or st.get('fill-color')):
+                    if st.get('casing-width') not in (None, 0) or st.get('casing-width-add') is not None:  # and (st.get('width') or st.get('fill-color')):
                         is_area_st = 'fill-color' in st
                         if has_lines and not is_area_st and st.get('casing-linecap', 'butt') == 'butt':
                             dr_line = LineRuleProto()
-                            dr_line.width = (st.get('width', 0) * WIDTH_SCALE) + (st.get('casing-width') * WIDTH_SCALE * 2)
+
+                            # 'casing-width' has precedence over 'casing-width-add'.
+                            if st.get('casing-width-add') is not None and st.get('casing-width') in (None, 0):
+                                # Look for base width in other style objects (usually ::default).
+                                base_width = 0
+                                for wst in zstyle:
+                                    if wst.get('width') not in (None, 0):
+                                        # Rail bridge styles use width from ::dash object instead of ::default.
+                                        if base_width == 0 or wst.get('object-id') != '::default':
+                                            base_width = wst.get('width', 0)
+                                st['casing-width'] = base_width + st.get('casing-width-add')
+
+                            dr_line.width = round((st.get('width', 0) + st.get('casing-width') * 2) * WIDTH_SCALE, 2)
                             dr_line.color = mwm_encode_color(colors, st, "casing")
                             if '-x-me-casing-line-priority' in st:
                                 dr_line.priority = int(st.get('-x-me-casing-line-priority'))

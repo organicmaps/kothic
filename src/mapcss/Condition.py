@@ -75,7 +75,7 @@ class Condition:
         t = self.type
         params = self.params
         if t == 'eq' and params[0][:2] == "::":
-            return "::%s" % (params[1])
+            return "%s" % (params[1])
         if t == 'eq':
             return "%s=%s" % (params[0], params[1])
         if t == 'ne':
