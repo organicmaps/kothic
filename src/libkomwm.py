@@ -355,7 +355,8 @@ def komap_mapswithme(options):
                         st['z-index'] = float(st.get('z-index', 0)) - 15001.
 
                     if st.get('casing-width') not in (None, 0):  # and (st.get('width') or st.get('fill-color')):
-                        if has_lines and st.get('casing-linecap', 'butt') == 'butt':
+                        is_area_st = 'fill-color' in st
+                        if has_lines and not is_area_st and st.get('casing-linecap', 'butt') == 'butt':
                             dr_line = LineRuleProto()
                             dr_line.width = (st.get('width', 0) * WIDTH_SCALE) + (st.get('casing-width') * WIDTH_SCALE * 2)
                             dr_line.color = mwm_encode_color(colors, st, "casing")
@@ -370,7 +371,7 @@ def komap_mapswithme(options):
                             dr_line.join = dr_linejoins.get(st.get('casing-linejoin', 'round'), ROUNDJOIN)
                             dr_element.lines.extend([dr_line])
 
-                        if has_fills and 'fill-color' in st and float(st.get('fill-opacity', 1)) > 0:
+                        if has_fills and is_area_st and float(st.get('fill-opacity', 1)) > 0:
                             dr_element.area.border.color = mwm_encode_color(colors, st, "casing")
                             dr_element.area.border.width = st.get('casing-width', 0) * WIDTH_SCALE
 
