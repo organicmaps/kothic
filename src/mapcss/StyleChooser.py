@@ -277,9 +277,6 @@ class StyleChooser:
                             b = str(float(b) / 2)
                         except:
                             pass
-                if "text" == a[-4:]:
-                    if b[:5] != "eval(":
-                        b = "eval(tag(\"" + b + "\"))"
                 if b[:5] == "eval(":
                     b = Eval(b)
                     self.has_evals = True

@@ -22,7 +22,7 @@ from .StyleChooser import StyleChooser
 from .Condition import Condition
 
 
-NEEDED_KEYS = set(["width", "casing-width", "fill-color", "fill-image", "icon-image", "text", "extrude",
+NEEDED_KEYS = set(["width", "casing-width", "casing-width-add", "fill-color", "fill-image", "icon-image", "text", "extrude",
                    "background-image", "background-color", "pattern-image", "shield-text", "symbol-shape"])
 
 WHITESPACE = re.compile(r'\s+ ', re.S | re.X)
