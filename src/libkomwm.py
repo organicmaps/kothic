@@ -120,7 +120,7 @@ def komap_mapswithme(options):
     colors_file_name = os.path.join(ddir, 'colors.txt')
     colors = set()
     if os.path.exists(colors_file_name):
-        colors_in_file = open(colors_file_name, "r")
+        colors_in_file = open(colors_file_name, "r", encoding="utf-8")
         for colorLine in colors_in_file:
             colors.add(int(colorLine))
         colors_in_file.close()
@@ -132,13 +132,13 @@ def komap_mapswithme(options):
 
     patterns_file_name = os.path.join(ddir, 'patterns.txt')
     if os.path.exists(patterns_file_name):
-        patterns_in_file = open(patterns_file_name, "r")
+        patterns_in_file = open(patterns_file_name, "r", encoding="utf-8")
         for patternsLine in patterns_in_file:
             addPattern([float(x) for x in patternsLine.split()])
         patterns_in_file.close()
 
     # Build classificator tree from mapcss-mapping.csv file
-    types_file = open(os.path.join(ddir, 'types.txt'), "w")
+    types_file = open(os.path.join(ddir, 'types.txt'), "w", encoding="utf-8")
 
     # Mapcss-mapping format
     #
@@ -163,7 +163,7 @@ def komap_mapswithme(options):
 
     cnt = 1
     unique_types_check = set()
-    for row in csv.reader(open(os.path.join(ddir, 'mapcss-mapping.csv')), delimiter=';'):
+    for row in csv.reader(open(os.path.join(ddir, 'mapcss-mapping.csv'), encoding="utf-8"), delimiter=';'):
         if len(row) <= 1:
             # Allow for empty lines and comments that do not contain ';' symbol
             continue
@@ -220,7 +220,7 @@ def komap_mapswithme(options):
             mapcss_static_tags[t] = mapcss_static_tags.get(t, True) and i == 0
 
     # Get all mapcss dynamic tags from mapcss-dynamic.txt
-    mapcss_dynamic_tags = set([line.rstrip() for line in open(os.path.join(ddir, 'mapcss-dynamic.txt'))])
+    mapcss_dynamic_tags = set([line.rstrip() for line in open(os.path.join(ddir, 'mapcss-dynamic.txt'), encoding="utf-8")])
 
     # Parse style mapcss
     global style
@@ -557,8 +557,8 @@ def komap_mapswithme(options):
         return -1
     viskeys.sort(key=functools.cmp_to_key(cmprepl))
 
-    visibility_file = open(os.path.join(ddir, 'visibility.txt'), "w")
-    classificator_file = open(os.path.join(ddir, 'classificator.txt'), "w")
+    visibility_file = open(os.path.join(ddir, 'visibility.txt'), "w", encoding="utf-8")
+    classificator_file = open(os.path.join(ddir, 'classificator.txt'), "w", encoding="utf-8")
 
     oldoffset = ""
     for k in viskeys:
@@ -579,12 +579,12 @@ def komap_mapswithme(options):
     visibility_file.close()
     classificator_file.close()
 
-    colors_file = open(colors_file_name, "w")
+    colors_file = open(colors_file_name, "w", encoding="utf-8")
     for c in sorted(colors):
         colors_file.write("%d\n" % (c))
     colors_file.close()
 
-    patterns_file = open(patterns_file_name, "w")
+    patterns_file = open(patterns_file_name, "w", encoding="utf-8")
     for p in patterns:
         patterns_file.write("%s\n" % (' '.join(str(elem) for elem in p)))
     patterns_file.close()
