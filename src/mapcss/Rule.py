@@ -59,10 +59,12 @@ class Rule():
     def extract_tags(self):
         a = set()
         for condition in self.conditions:
-            a.add(condition.extract_tag())
-            if "*" in a:
-                a = set(["*"])
-                break
+            tag = condition.extract_tag()
+            if tag != '*':
+                a.add(tag)
+            elif len(a) == 0:
+                return set(["*"])
+
         return a
 
 
