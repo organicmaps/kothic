@@ -112,7 +112,7 @@ class MapCSS():
         else:
             logging.error("unparsed zoom: %s" % s)
 
-    def build_choosers_tree(self, clname, type, tags={}):
+    def build_choosers_tree(self, clname, type, cltag):
         if type not in self.choosers_by_type_and_tag:
             self.choosers_by_type_and_tag[type] = {}
         if clname not in self.choosers_by_type_and_tag[type]:
@@ -120,7 +120,7 @@ class MapCSS():
         if type in self.choosers_by_type:
             for chooser in self.choosers_by_type[type]:
                 for tag in chooser.extract_tags():
-                    if tag == "*" or tag in tags:
+                    if tag == "*" or tag == cltag:
                         if chooser not in self.choosers_by_type_and_tag[type][clname]:
                             self.choosers_by_type_and_tag[type][clname].add(chooser)
                         break

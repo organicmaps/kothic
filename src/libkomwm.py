@@ -231,10 +231,11 @@ def komap_mapswithme(options):
     # Build optimization tree - class/type -> StyleChoosers
     for cl in class_order:
         clname = cl if cl.find('-') == -1 else cl[:cl.find('-')]
-        cltags = classificator[cl]
-        style.build_choosers_tree(clname, "line", cltags)
-        style.build_choosers_tree(clname, "area", cltags)
-        style.build_choosers_tree(clname, "node", cltags)
+        # Get first tag of the class/type.
+        cltag = next(iter(classificator[cl].keys()))
+        style.build_choosers_tree(clname, "line", cltag)
+        style.build_choosers_tree(clname, "area", cltag)
+        style.build_choosers_tree(clname, "node", cltag)
     style.restore_choosers_order("line")
     style.restore_choosers_order("area")
     style.restore_choosers_order("node")
