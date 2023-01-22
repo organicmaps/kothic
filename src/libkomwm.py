@@ -72,18 +72,31 @@ def query_style(args):
 
     results = []
     for zoom in range(minzoom, maxzoom + 1):
-        runtime_conditions_arr = []
-
+        all_runtime_conditions_arr = []
         # Get runtime conditions which are used for class 'cl' on zoom 'zoom'
         if "area" not in cltags:
-            runtime_conditions_arr.extend(style.get_runtime_rules(clname, "line", cltags, zoom))
-        runtime_conditions_arr.extend(style.get_runtime_rules(clname, "area", cltags, zoom))
+            all_runtime_conditions_arr.extend(style.get_runtime_rules(clname, "line", cltags, zoom))
+        all_runtime_conditions_arr.extend(style.get_runtime_rules(clname, "area", cltags, zoom))
         if "area" not in cltags:
-            runtime_conditions_arr.extend(style.get_runtime_rules(clname, "node", cltags, zoom))
+            all_runtime_conditions_arr.extend(style.get_runtime_rules(clname, "node", cltags, zoom))
 
-        # If there is no any runtime conditions, do not filter style by runtime conditions
-        if len(runtime_conditions_arr) == 0:
+        runtime_conditions_arr = []
+        if len(all_runtime_conditions_arr) == 0:
+            # If there is no runtime conditions, do not filter style by runtime conditions
             runtime_conditions_arr.append(None)
+        elif len(all_runtime_conditions_arr) == 1:
+            runtime_conditions_arr = all_runtime_conditions_arr
+        else:
+            # Keep unique conditions only
+            runtime_conditions_arr.append(all_runtime_conditions_arr.pop(0))
+            for new_rt_conditions in all_runtime_conditions_arr:
+                conditions_unique = True
+                for rt_conditions in runtime_conditions_arr:
+                    if new_rt_conditions == rt_conditions:
+                        conditions_unique = False
+                        break
+                if conditions_unique:
+                    runtime_conditions_arr.append(new_rt_conditions)
 
         for runtime_conditions in runtime_conditions_arr:
             has_icons_for_areas = False
