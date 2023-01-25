@@ -33,42 +33,44 @@ class Condition:
 
     def test(self, tags):
         """
-        Test a hash against this condition
+        Test tags against this condition
         """
         t = self.type
         params = self.params
-        if t == 'eq':   # don't compare tags against sublayers
+
+        if t == 'eq':
+            # Don't compare tags against sublayers
             if params[0][:2] == "::":
                 return params[1]
-        try:
-            if t == 'eq':
-                return tags[params[0]] == params[1]
-            if t == 'ne':
-                return tags.get(params[0], "") != params[1]
-            if t == 'regex':
-                return bool(self.regex.match(tags[params[0]]))
-            if t == 'true':
-                return tags.get(params[0]) == 'yes'
-            if t == 'untrue':
-                return tags.get(params[0]) == 'no'
-            if t == 'set':
-                if params[0] in tags:
-                    return tags[params[0]] != ''
-                return False
-            if t == 'unset':
-                if params[0] in tags:
-                    return tags[params[0]] == ''
-                return True
-            if t == '<':
-                return (Number(tags[params[0]]) < Number(params[1]))
-            if t == '<=':
-                return (Number(tags[params[0]]) <= Number(params[1]))
-            if t == '>':
-                return (Number(tags[params[0]]) > Number(params[1]))
-            if t == '>=':
-                return (Number(tags[params[0]]) >= Number(params[1]))
-        except KeyError:
-            pass
+            return (params[0] in tags and tags[params[0]] == params[1])
+        if t == 'ne':
+            return (params[0] not in tags or tags[params[0]] != params[1])
+        if t == 'true':
+            return tags.get(params[0]) == 'yes'
+        if t == 'untrue':
+            return tags.get(params[0]) == 'no'
+        if t == 'set':
+            if params[0] in tags:
+                return tags[params[0]] != ''
+            return False
+        if t == 'unset':
+            if params[0] in tags:
+                return tags[params[0]] == ''
+            return True
+
+        if params[0] not in tags:
+            return False
+        if t == 'regex':
+            return bool(self.regex.match(tags[params[0]]))
+        if t == '<':
+            return (Number(tags[params[0]]) < Number(params[1]))
+        if t == '<=':
+            return (Number(tags[params[0]]) <= Number(params[1]))
+        if t == '>':
+            return (Number(tags[params[0]]) > Number(params[1]))
+        if t == '>=':
+            return (Number(tags[params[0]]) >= Number(params[1]))
+
         return False
 
     def __repr__(self):
