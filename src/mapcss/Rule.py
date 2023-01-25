@@ -25,7 +25,7 @@ type_matches = {
 
 class Rule():
     def __init__(self, s=''):
-        self.runtime_conditions = []
+        self.runtime_conditions = None
         self.conditions = []
         # self.isAnd = True
         self.minZoom = 0
@@ -33,6 +33,7 @@ class Rule():
         if s == "*":
             s = ""
         self.subject = s    # "", "way", "node" or "relation"
+        self.type_matches = type_matches[s] if s in type_matches else set()
 
     def __repr__(self):
         return "%s|z%s-%s %s %s" % (self.subject, self.minZoom, self.maxZoom, self.conditions, self.runtime_conditions)
@@ -41,7 +42,7 @@ class Rule():
         if (zoom < self.minZoom) or (zoom > self.maxZoom):
             return False
 
-        if (self.subject != '') and not _test_feature_compatibility(obj, self.subject, tags):
+        if (obj not in self.type_matches):
             return False
 
         subpart = "::default"
@@ -66,28 +67,3 @@ class Rule():
                 return set(["*"])
 
         return a
-
-
-def _test_feature_compatibility(f1, f2, tags={}):
-    """
-    Checks if feature of type f1 is compatible with f2.
-    """
-    if f2 == f1:
-        return True
-    if f2 not in ("way", "area", "line"):
-        return False
-    elif f2 == "way" and f1 == "line":
-        return True
-    elif f2 == "way" and f1 == "area":
-        return True
-    elif f2 == "area" and f1 in ("way", "area"):
-#      if ":area" in tags:
-        return True
-#      else:
-#        return False
-    elif f2 == "line" and f1 in ("way", "line", "area"):
-        return True
-    else:
-        return False
-    # print f1, f2, True
-    return True

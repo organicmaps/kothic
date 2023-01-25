@@ -87,6 +87,7 @@ class StyleChooser:
         self.selzooms = None
         self.compatible_types = set()
         self.has_evals = False
+        self.has_runtime_conditions = False
         self.cached_tags = None
 
     def extract_tags(self):
@@ -96,32 +97,24 @@ class StyleChooser:
         for r in self.ruleChains:
             a.update(r.extract_tags())
             if "*" in a:
-                a.clear()
-                a.add("*")
+                a = set('*')
                 break
         if self.has_evals and "*" not in a:
             for s in self.styles:
                 for v in list(s.values()):
                     if type(v) == self.eval_type:
                         a.update(v.extract_tags())
-        if "*" in a or len(a) == 0:
-            a.clear()
-            a.add("*")
+        if len(a) == 0:
+            a = set('*')
         self.cached_tags = a
         return a
 
     def get_runtime_conditions(self, ftype, tags, zoom):
-        has_rt_conds = False
-        for rule in self.ruleChains:
-            if (len(rule.runtime_conditions) > 0):
-                has_rt_conds = True
-                break
-        if not has_rt_conds:
+        if not self.has_runtime_conditions:
             return None
 
-        if self.selzooms:
-            if zoom < self.selzooms[0] or zoom > self.selzooms[1]:
-                return None
+        if zoom < self.selzooms[0] or zoom > self.selzooms[1]:
+            return None
 
         rule_and_object_id = self.testChain(self.ruleChains, ftype, tags, zoom)
 
@@ -130,30 +123,11 @@ class StyleChooser:
 
         rule = rule_and_object_id[0]
 
-        if (len(rule.runtime_conditions) == 0):
-            return None
-
         return rule.runtime_conditions
 
-    def isCorrespondingRule(self, filter_by_runtime_conditions, rule):
-        # If rule can be applied according to runtime conditions, then
-        # function return true, else it returns false
-        if len(rule.runtime_conditions) == 0:
-            return True
-        if filter_by_runtime_conditions is None:
-            return True
-        if filter_by_runtime_conditions == rule.runtime_conditions:
-            return True
-        # Actually we should check rule.runtime_conditions is a subset of filter_by_runtime_conditions
-        for r in rule.runtime_conditions:
-            if r not in filter_by_runtime_conditions:
-                return False
-        return True
-
     def updateStyles(self, sl, ftype, tags, zoom, xscale, zscale, filter_by_runtime_conditions):
-        if self.selzooms:
-            if zoom < self.selzooms[0] or zoom > self.selzooms[1]:
-                return sl
+        if zoom < self.selzooms[0] or zoom > self.selzooms[1]:
+            return sl
 
         #if ftype not in self.compatible_types:
             #return sl
@@ -167,7 +141,9 @@ class StyleChooser:
         rule = rule_and_object_id[0]
         object_id = rule_and_object_id[1]
 
-        if not self.isCorrespondingRule(filter_by_runtime_conditions, rule):
+        if (filter_by_runtime_conditions is not None
+            and rule.runtime_conditions is not None
+            and filter_by_runtime_conditions != rule.runtime_conditions):
             return sl
 
         for r in self.styles:
@@ -257,8 +233,11 @@ class StyleChooser:
         """
         adds into the current ruleChain (existing Rule)
         """
-        self.ruleChains[-1].runtime_conditions.append(c)
-        self.ruleChains[-1].runtime_conditions.sort()
+        if self.ruleChains[-1].runtime_conditions is None:
+            self.ruleChains[-1].runtime_conditions = [c]
+            self.has_runtime_conditions = True
+        else:
+            self.ruleChains[-1].runtime_conditions.append(c)
 
     def addStyles(self, a):
         # print "addStyle ", a
