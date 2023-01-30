@@ -126,12 +126,6 @@ class StyleChooser:
         return rule.runtime_conditions
 
     def updateStyles(self, sl, ftype, tags, zoom, xscale, zscale, filter_by_runtime_conditions):
-        if zoom < self.selzooms[0] or zoom > self.selzooms[1]:
-            return sl
-
-        #if ftype not in self.compatible_types:
-            #return sl
-
         # Are any of the ruleChains fulfilled?
         rule_and_object_id = self.testChain(self.ruleChains, ftype, tags, zoom)
 

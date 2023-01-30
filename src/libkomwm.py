@@ -237,21 +237,24 @@ def komap_mapswithme(options):
 
     # Parse style mapcss
     global style
-    style = MapCSS(options.minzoom, options.maxzoom + 1)
+    style = MapCSS(options.minzoom, options.maxzoom)
     style.parse(filename=options.filename, static_tags=mapcss_static_tags,
                 dynamic_tags=mapcss_dynamic_tags)
 
-    # Build optimization tree - class/type -> StyleChoosers
+    # Build optimization tree - class/zoom/type -> StyleChoosers
+    clname_cltag_unique = set()
     for cl in class_order:
         clname = cl if cl.find('-') == -1 else cl[:cl.find('-')]
         # Get first tag of the class/type.
         cltag = next(iter(classificator[cl].keys()))
-        style.build_choosers_tree(clname, "line", cltag)
-        style.build_choosers_tree(clname, "area", cltag)
-        style.build_choosers_tree(clname, "node", cltag)
-    style.restore_choosers_order("line")
-    style.restore_choosers_order("area")
-    style.restore_choosers_order("node")
+        clname_cltag = clname + '$' + cltag
+        if clname_cltag not in clname_cltag_unique:
+            clname_cltag_unique.add(clname_cltag)
+            style.build_choosers_tree(clname, "line", cltag)
+            style.build_choosers_tree(clname, "area", cltag)
+            style.build_choosers_tree(clname, "node", cltag)
+
+    style.finalize_choosers_tree()
 
     # Get colors section from style
     style_colors = {}
