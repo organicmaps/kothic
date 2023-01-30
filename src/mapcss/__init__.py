@@ -96,7 +96,7 @@ class MapCSS():
         self.scalepair = (minscale, maxscale)
         self.choosers = []
         self.choosers_by_type = {}
-        self.choosers_by_type_and_tag = {}
+        self.choosers_by_type_zoom_tag = {}
         self.variables = {}
         self.style_loaded = False
 
@@ -113,34 +113,36 @@ class MapCSS():
             logging.error("unparsed zoom: %s" % s)
 
     def build_choosers_tree(self, clname, type, cltag):
-        if type not in self.choosers_by_type_and_tag:
-            self.choosers_by_type_and_tag[type] = {}
-        if clname not in self.choosers_by_type_and_tag[type]:
-            self.choosers_by_type_and_tag[type][clname] = set()
+        if type not in self.choosers_by_type_zoom_tag:
+            self.choosers_by_type_zoom_tag[type] = {}
+        for zoom in range(self.minscale, self.maxscale + 1):
+            if zoom not in self.choosers_by_type_zoom_tag[type]:
+                self.choosers_by_type_zoom_tag[type][zoom] = {}
+            if clname not in self.choosers_by_type_zoom_tag[type][zoom]:
+                self.choosers_by_type_zoom_tag[type][zoom][clname] = {'arr': [], 'set': set()}
         if type in self.choosers_by_type:
             for chooser in self.choosers_by_type[type]:
-                for tag in chooser.extract_tags():
-                    if tag == "*" or tag == cltag:
-                        if chooser not in self.choosers_by_type_and_tag[type][clname]:
-                            self.choosers_by_type_and_tag[type][clname].add(chooser)
-                        break
+                chooser_tags = chooser.extract_tags()
+                if '*' in chooser_tags or cltag in chooser_tags:
+                    for zoom in range(int(chooser.selzooms[0]), int(chooser.selzooms[1]) + 1):
+                        if chooser not in self.choosers_by_type_zoom_tag[type][zoom][clname]['set']:
+                            self.choosers_by_type_zoom_tag[type][zoom][clname]['arr'].append(chooser)
+                            self.choosers_by_type_zoom_tag[type][zoom][clname]['set'].add(chooser)
 
-    def restore_choosers_order(self, type):
-        ethalon_choosers = self.choosers_by_type[type]
-        for tag, choosers_for_tag in list(self.choosers_by_type_and_tag[type].items()):
-            tmp = []
-            for ec in ethalon_choosers:
-                if ec in choosers_for_tag:
-                    tmp.append(ec)
-            self.choosers_by_type_and_tag[type][tag] = tmp
+    def finalize_choosers_tree(self):
+        # Remove unneeded unique sets of choosers
+        for ftype in self.choosers_by_type_zoom_tag.keys():
+            for zoom in self.choosers_by_type_zoom_tag[ftype].keys():
+                for clname in self.choosers_by_type_zoom_tag[ftype][zoom].keys():
+                    self.choosers_by_type_zoom_tag[ftype][zoom][clname] = self.choosers_by_type_zoom_tag[ftype][zoom][clname]['arr']
 
     def get_runtime_rules(self, clname, type, tags, zoom):
         """
         Returns array of runtime_conditions which are used for clname/type/tags/zoom
         """
         runtime_rules = []
-        if type in self.choosers_by_type_and_tag:
-            for chooser in self.choosers_by_type_and_tag[type][clname]:
+        if type in self.choosers_by_type_zoom_tag:
+            for chooser in self.choosers_by_type_zoom_tag[type][zoom][clname]:
                 runtime_conditions = chooser.get_runtime_conditions(type, tags, zoom)
                 if runtime_conditions:
                     runtime_rules.append(runtime_conditions)
@@ -148,8 +150,8 @@ class MapCSS():
 
     def get_style(self, clname, type, tags, zoom, xscale, zscale, filter_by_runtime_conditions):
         style = []
-        if type in self.choosers_by_type_and_tag:
-            for chooser in self.choosers_by_type_and_tag[type][clname]:
+        if type in self.choosers_by_type_zoom_tag:
+            for chooser in self.choosers_by_type_zoom_tag[type][zoom][clname]:
                 style = chooser.updateStyles(style, type, tags, zoom, xscale, zscale, filter_by_runtime_conditions)
         style = [x for x in style if x["object-id"] != "::*"]
         for x in style:
