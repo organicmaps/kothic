@@ -130,11 +130,26 @@ class MapCSS():
                             self.choosers_by_type_zoom_tag[type][zoom][clname]['set'].add(chooser)
 
     def finalize_choosers_tree(self):
-        # Remove unneeded unique sets of choosers
         for ftype in self.choosers_by_type_zoom_tag.keys():
             for zoom in self.choosers_by_type_zoom_tag[ftype].keys():
                 for clname in self.choosers_by_type_zoom_tag[ftype][zoom].keys():
+                    # Discard unneeded unique set of choosers.
                     self.choosers_by_type_zoom_tag[ftype][zoom][clname] = self.choosers_by_type_zoom_tag[ftype][zoom][clname]['arr']
+                    for i in range(0, len(self.choosers_by_type_zoom_tag[ftype][zoom][clname])):
+                        chooser = self.choosers_by_type_zoom_tag[ftype][zoom][clname][i]
+                        optimized = StyleChooser(chooser.scalepair)
+                        optimized.styles = chooser.styles
+                        optimized.eval_type = chooser.eval_type
+                        optimized.has_evals = chooser.has_evals
+                        optimized.has_runtime_conditions = chooser.has_runtime_conditions
+                        optimized.selzooms = [zoom, zoom]
+                        optimized.ruleChains = []
+                        for rule in chooser.ruleChains:
+                            # Discard chooser's rules that don't match type or zoom.
+                            if ftype in rule.type_matches and zoom >= rule.minZoom and zoom <= rule.maxZoom:
+                                optimized.ruleChains.append(rule)
+                        self.choosers_by_type_zoom_tag[ftype][zoom][clname][i] = optimized
+
 
     def get_runtime_rules(self, clname, type, tags, zoom):
         """
@@ -143,7 +158,7 @@ class MapCSS():
         runtime_rules = []
         if type in self.choosers_by_type_zoom_tag:
             for chooser in self.choosers_by_type_zoom_tag[type][zoom][clname]:
-                runtime_conditions = chooser.get_runtime_conditions(type, tags, zoom)
+                runtime_conditions = chooser.get_runtime_conditions(tags)
                 if runtime_conditions:
                     runtime_rules.append(runtime_conditions)
         return runtime_rules
@@ -152,7 +167,7 @@ class MapCSS():
         style = []
         if type in self.choosers_by_type_zoom_tag:
             for chooser in self.choosers_by_type_zoom_tag[type][zoom][clname]:
-                style = chooser.updateStyles(style, type, tags, zoom, xscale, zscale, filter_by_runtime_conditions)
+                style = chooser.updateStyles(style, tags, xscale, zscale, filter_by_runtime_conditions)
         style = [x for x in style if x["object-id"] != "::*"]
         for x in style:
             for k, v in [('width', 0), ('casing-width', 0)]:

@@ -109,14 +109,11 @@ class StyleChooser:
         self.cached_tags = a
         return a
 
-    def get_runtime_conditions(self, ftype, tags, zoom):
+    def get_runtime_conditions(self, tags):
         if not self.has_runtime_conditions:
             return None
 
-        if zoom < self.selzooms[0] or zoom > self.selzooms[1]:
-            return None
-
-        rule_and_object_id = self.testChain(self.ruleChains, ftype, tags, zoom)
+        rule_and_object_id = self.testChains(tags)
 
         if not rule_and_object_id:
             return None
@@ -125,9 +122,9 @@ class StyleChooser:
 
         return rule.runtime_conditions
 
-    def updateStyles(self, sl, ftype, tags, zoom, xscale, zscale, filter_by_runtime_conditions):
+    def updateStyles(self, sl, tags, xscale, zscale, filter_by_runtime_conditions):
         # Are any of the ruleChains fulfilled?
-        rule_and_object_id = self.testChain(self.ruleChains, ftype, tags, zoom)
+        rule_and_object_id = self.testChains(tags)
 
         if not rule_and_object_id:
             return sl
@@ -181,12 +178,12 @@ class StyleChooser:
 
         return sl
 
-    def testChain(self, chain, obj, tags, zoom):
+    def testChains(self, tags):
         """
         Tests an object against a chain
         """
-        for r in chain:
-            tt = r.test(obj, tags, zoom)
+        for r in self.ruleChains:
+            tt = r.test(tags)
             if tt:
                 return r, tt
         return False
