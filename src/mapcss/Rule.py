@@ -38,13 +38,7 @@ class Rule():
     def __repr__(self):
         return "%s|z%s-%s %s %s" % (self.subject, self.minZoom, self.maxZoom, self.conditions, self.runtime_conditions)
 
-    def test(self, obj, tags, zoom):
-        if (zoom < self.minZoom) or (zoom > self.maxZoom):
-            return False
-
-        if (obj not in self.type_matches):
-            return False
-
+    def test(self, tags):
         subpart = "::default"
         for condition in self.conditions:
             res = condition.test(tags)
