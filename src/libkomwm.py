@@ -99,7 +99,6 @@ def query_style(args):
                     runtime_conditions_arr.append(new_rt_conditions)
 
         for runtime_conditions in runtime_conditions_arr:
-            has_icons_for_areas = False
             zstyle = {}
 
             # Get style for class 'cl' on zoom 'zoom' with corresponding runtime conditions
@@ -107,16 +106,12 @@ def query_style(args):
                 linestyle = style.get_style_dict(clname, "line", cltags, zoom, olddict=zstyle, filter_by_runtime_conditions=runtime_conditions)
                 zstyle = linestyle
             areastyle = style.get_style_dict(clname, "area", cltags, zoom, olddict=zstyle, filter_by_runtime_conditions=runtime_conditions)
-            for st in list(areastyle.values()):
-                if "icon-image" in st or 'symbol-shape' in st or 'symbol-image' in st:
-                    has_icons_for_areas = True
-                    break
             zstyle = areastyle
             if "area" not in cltags:
                 nodestyle = style.get_style_dict(clname, "node", cltags, zoom, olddict=zstyle, filter_by_runtime_conditions=runtime_conditions)
                 zstyle = nodestyle
 
-            results.append((cl, zoom, has_icons_for_areas, runtime_conditions, list(zstyle.values())))
+            results.append((cl, zoom, runtime_conditions, list(zstyle.values())))
     return results
 
 
@@ -297,7 +292,7 @@ def komap_mapswithme(options):
 
     for results in imapfunc(query_style, ((cl, classificator[cl], options.minzoom, options.maxzoom) for cl in class_order)):
         for result in results:
-                cl, zoom, has_icons_for_areas, runtime_conditions, zstyle = result
+                cl, zoom, runtime_conditions, zstyle = result
 
                 # First, sort rules by 'object-id' in captions (primary, secondary, none ..);
                 # Then by 'z-index' in ascending order.
@@ -462,8 +457,6 @@ def komap_mapswithme(options):
 
                     if has_icons:
                         if st.get('icon-image'):
-                            if not has_icons_for_areas:
-                                dr_element.symbol.apply_for_type = 1
                             icon = mwm_encode_image(st)
                             dr_element.symbol.name = icon[0]
                             if '-x-me-icon-priority' in st:
