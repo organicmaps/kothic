@@ -4,6 +4,7 @@ import os
 import csv
 import sys
 import functools
+from itertools import chain
 from multiprocessing import Pool, set_start_method
 from collections import OrderedDict
 import mapcss.webcolors
@@ -131,6 +132,21 @@ def query_style(args):
             results.append((cl, zoom, runtime_conditions, list(zstyle.values())))
     return results
 
+def apply_min_visible_scale(dr_zooms, maxzoom):
+    # Inverse minVisibleScale (lower scale means higher priority).
+    min_visible_scale_adjustment = maxzoom - dr_zooms[0].scale
+    # Overlays priorities range is [15000, 17000), make it [0, 2000)
+    # and add 10000 per zoom level, the final range is [0, 182000).
+    min_visible_scale_adjustment = -15000 + min_visible_scale_adjustment * 10000
+    for drz in dr_zooms:
+        for dr in chain((drz.caption, drz.symbol, drz.path_text, drz.circle)):
+            if dr.priority:
+                if dr.priority < 15000 or dr.priority >= 17000:
+                    print("Overlay priority out of range: ", dr.priority)
+                dr.priority += min_visible_scale_adjustment
+        if drz.shield.priority:
+            # TODO: minVisibleScale for shields is hardcoded to 10 for now.
+            drz.shield.priority += -15000 + (maxzoom - 10) * 10000
 
 def komap_mapswithme(options):
     if options.data and os.path.isdir(options.data):
@@ -310,6 +326,7 @@ def komap_mapswithme(options):
 
                 if dr_cont is not None and dr_cont.name != cl:
                     if dr_cont.element:
+                        apply_min_visible_scale(dr_cont.element, options.maxzoom)
                         drules.cont.extend([dr_cont])
                     visibility["world|" + class_tree[dr_cont.name] + "|"] = "".join(visstring)
                     dr_cont = None
@@ -539,6 +556,7 @@ def komap_mapswithme(options):
 
     if dr_cont is not None:
         if dr_cont.element:
+            apply_min_visible_scale(dr_cont.element, options.maxzoom)
             drules.cont.extend([dr_cont])
 
         visibility["world|" + class_tree[cl] + "|"] = "".join(visstring)
