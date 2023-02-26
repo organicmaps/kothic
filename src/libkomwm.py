@@ -349,6 +349,9 @@ def komap_mapswithme(options):
 
                 visstring[zoom] = "1"
 
+                if zoom == 0:
+                    continue
+
                 dr_element = DrawElementProto()
                 dr_element.scale = zoom
 
