@@ -133,20 +133,29 @@ def query_style(args):
     return results
 
 def apply_min_visible_scale(dr_zooms, maxzoom):
+    # Determine minVisibleScale for overlays only, i.e. disregarding lines and areas visibility.
+    def get_overlays_min_visible_scale(dr_zooms):
+        for drz in dr_zooms:
+            for dr in chain((drz.caption, drz.symbol, drz.path_text, drz.shield, drz.circle)):
+                if dr.priority:
+                    return drz.scale
+        return None
+
+    overlays_min_visible_scale = get_overlays_min_visible_scale(dr_zooms)
+    if overlays_min_visible_scale is None:
+        return
+
     # Inverse minVisibleScale (lower scale means higher priority).
-    min_visible_scale_adjustment = maxzoom - dr_zooms[0].scale
+    min_visible_scale_adjustment = maxzoom - overlays_min_visible_scale
     # Overlays priorities range is [15000, 17000), make it [0, 2000)
     # and add 10000 per zoom level, the final range is [0, 182000).
     min_visible_scale_adjustment = -15000 + min_visible_scale_adjustment * 10000
     for drz in dr_zooms:
-        for dr in chain((drz.caption, drz.symbol, drz.path_text, drz.circle)):
+        for dr in chain((drz.caption, drz.symbol, drz.path_text, drz.shield, drz.circle)):
             if dr.priority:
                 if dr.priority < 15000 or dr.priority >= 17000:
                     print("Overlay priority out of range: ", dr.priority)
                 dr.priority += min_visible_scale_adjustment
-        if drz.shield.priority:
-            # TODO: minVisibleScale for shields is hardcoded to 10 for now.
-            drz.shield.priority += -15000 + (maxzoom - 10) * 10000
 
 def komap_mapswithme(options):
     if options.data and os.path.isdir(options.data):
