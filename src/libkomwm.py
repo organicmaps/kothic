@@ -503,6 +503,9 @@ def komap_mapswithme(options):
                                     dr_cur_subtext.is_optional = value
                                 else:
                                     dr_cur_subtext.is_optional = True
+                            elif st.get('text-position', 'center') == 'center' and dr_element.symbol.priority:
+                                # On by default for all captions (not path texts) with icons.
+                                dr_cur_subtext.is_optional = True
                             dr_cur_subtext = dr_text.secondary
 
                         #  Priority is assigned from the first (primary) rule.
