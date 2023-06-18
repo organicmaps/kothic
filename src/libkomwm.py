@@ -27,6 +27,23 @@ from drules_struct_pb2 import *
 
 WIDTH_SCALE = 1.0
 
+# z-index values defined in mapcss files are first
+# compressed into a 0-1000 integer range
+# and then adjusted to divide into following "priorities ranges":
+# (15000; 17000) : overlays (icons, captions...)
+# [0; 1000)      : FG - foreground areas and lines
+# [-1000; 0)     : BG-top - water, linear and areal, rendered just on top of landcover
+# (-2000; -1000) : BG-by-size - landcover areas, later in core sorted by their bbox size
+# The core renderer then re-adjusts those ranges as necessary to accomodate
+# for special behavior and features' layer=* values.
+# See drape_frontend/stylist.cpp for the details of layering logic.
+
+PRIORITY_RANGE = 1000 # All z-indexes are compressed into this range.
+
+# Drules are arranged into following ranges depending on "fill-position: *".
+BASE_PRIORITY_FG = 0
+BASE_PRIORITY_BG_TOP = -1000
+BASE_PRIORITY_BG_BY_SIZE = -2000
 
 def to_boolean(s):
     s = s.lower()
@@ -213,7 +230,8 @@ def komap_mapswithme(options):
     # Parse style mapcss
     global style
     style = MapCSS(options.minzoom, options.maxzoom)
-    style.parse(filename=options.filename, static_tags=mapcss_static_tags,
+    style.parse(clamp=True, stretch=PRIORITY_RANGE,
+                filename=options.filename, static_tags=mapcss_static_tags,
                 dynamic_tags=mapcss_dynamic_tags)
 
     # Build optimization tree - class/zoom/type -> StyleChoosers
@@ -242,8 +260,6 @@ def komap_mapswithme(options):
             style_colors[k] = mwm_encode_color(colors, raw_style_colors, k)
 
     visibility = {}
-
-    bgpos = 0
 
     dr_linecaps = {'none': BUTTCAP, 'butt': BUTTCAP, 'round': ROUNDCAP}
     dr_linejoins = {'none': NOJOIN, 'bevel': BEVELJOIN, 'round': ROUNDJOIN}
@@ -365,10 +381,11 @@ def komap_mapswithme(options):
 
                             dr_line.width = round((base_width + st.get('casing-width') * 2) * WIDTH_SCALE, 2)
                             dr_line.color = mwm_encode_color(colors, st, "casing")
-                            if '-x-me-casing-line-priority' in st:
-                                dr_line.priority = int(st.get('-x-me-casing-line-priority'))
+                            # Casing line should be rendered below the "main" line, hence priority -1.
+                            if st.get('fill-position', 'foreground') == 'background-top':
+                                dr_line.priority = max(int(st.get('z-index', 0)) + BASE_PRIORITY_BG_TOP - 1, BASE_PRIORITY_BG_TOP)
                             else:
-                                dr_line.priority = min(int(st.get('z-index', 0) + 999), 20000)
+                                dr_line.priority = max(int(st.get('z-index', 0)) + BASE_PRIORITY_FG - 1, BASE_PRIORITY_FG)
                             dashes = st.get('casing-dashes', st.get('dashes', []))
                             dr_line.dashdot.dd.extend(dashes)
                             addPattern(dr_line.dashdot.dd)
@@ -402,10 +419,10 @@ def komap_mapswithme(options):
                             addPattern(dr_line.dashdot.dd)
                             dr_line.cap = dr_linecaps.get(st.get('linecap', 'butt'), BUTTCAP)
                             dr_line.join = dr_linejoins.get(st.get('linejoin', 'round'), ROUNDJOIN)
-                            if '-x-me-line-priority' in st:
-                                dr_line.priority = int(st.get('-x-me-line-priority'))
+                            if st.get('fill-position', 'foreground') == 'background-top':
+                                dr_line.priority = int(st.get('z-index', 0)) + BASE_PRIORITY_BG_TOP
                             else:
-                                dr_line.priority = min((int(st.get('z-index', 0)) + 1000), 20000)
+                                dr_line.priority = int(st.get('z-index', 0)) + BASE_PRIORITY_FG
                             dr_element.lines.extend([dr_line])
                         if st.get('pattern-image'):
                             dr_line = LineRuleProto()
@@ -415,10 +432,10 @@ def komap_mapswithme(options):
                             dr_line.pathsym.name = icon[0]
                             dr_line.pathsym.step = float(st.get('pattern-spacing', 0)) - 16
                             dr_line.pathsym.offset = st.get('pattern-offset', 0)
-                            if '-x-me-line-priority' in st:
-                                dr_line.priority = int(st.get('-x-me-line-priority'))
+                            if st.get('fill-position', 'foreground') == 'background-top':
+                                dr_line.priority = int(st.get('z-index', 0)) + BASE_PRIORITY_BG_TOP
                             else:
-                                dr_line.priority = int(st.get('z-index', 0)) + 1000
+                                dr_line.priority = int(st.get('z-index', 0)) + BASE_PRIORITY_FG
                             dr_element.lines.extend([dr_line])
                         if st.get('shield-font-size'):
                             dr_element.shield.height = int(st.get('shield-font-size', 10))
@@ -503,23 +520,13 @@ def komap_mapswithme(options):
                     if has_fills:
                         if ('fill-color' in st) and (float(st.get('fill-opacity', 1)) > 0):
                             dr_element.area.color = mwm_encode_color(colors, st, "fill")
-                            priority = 0
+                            dr_element.area.priority = int(st.get('z-index', 0))
                             if st.get('fill-position', 'foreground') == 'background':
-                                if 'z-index' not in st:
-                                    bgpos -= 1
-                                    priority = bgpos - 16000
-                                else:
-                                    zzz = int(st.get('z-index', 0))
-                                    if zzz > 0:
-                                        priority = zzz - 16000
-                                    else:
-                                        priority = zzz - 16700
+                                dr_element.area.priority += BASE_PRIORITY_BG_BY_SIZE
+                            elif (st.get('fill-position', 'foreground') == 'background-top'):
+                                dr_element.area.priority += BASE_PRIORITY_BG_TOP
                             else:
-                                priority = (int(st.get('z-index', 0)) + 1 + 1000)
-                            if '-x-me-area-priority' in st:
-                                dr_element.area.priority = int(st.get('-x-me-area-priority'))
-                            else:
-                                dr_element.area.priority = priority
+                                dr_element.area.priority += BASE_PRIORITY_FG
                             has_fills = False
 
                 str_dr_element = dr_cont.name + "/" + str(dr_element)

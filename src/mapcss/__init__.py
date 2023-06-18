@@ -389,13 +389,12 @@ class MapCSS():
                         zindex.add(float(stylez.get('z-index', 0)))
                 zindex = list(zindex)
                 zindex.sort()
-                zoffset = len([x for x in zindex if x < 0])
                 for chooser in self.choosers:
                     for stylez in chooser.styles:
                         if 'z-index' in stylez:
-                            res = zindex.index(float(stylez.get('z-index', 0))) - zoffset
+                            res = zindex.index(float(stylez.get('z-index', 0)))
                             if stretch:
-                                stylez['z-index'] = 1. * res / len(zindex) * stretch
+                                stylez['z-index'] = stretch * res / len(zindex)
                             else:
                                 stylez['z-index'] = res
         except TypeError:
