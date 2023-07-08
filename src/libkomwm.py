@@ -386,8 +386,8 @@ def komap_mapswithme(options):
                                 dr_line.priority = max(int(st.get('z-index', 0)) + BASE_PRIORITY_BG_TOP - 1, BASE_PRIORITY_BG_TOP)
                             else:
                                 dr_line.priority = max(int(st.get('z-index', 0)) + BASE_PRIORITY_FG - 1, BASE_PRIORITY_FG)
-                            dashes = st.get('casing-dashes', st.get('dashes', []))
-                            dr_line.dashdot.dd.extend(dashes)
+                            for i in st.get('casing-dashes', st.get('dashes', [])):
+                                dr_line.dashdot.dd.extend([max(float(i), 1) * WIDTH_SCALE])
                             addPattern(dr_line.dashdot.dd)
                             dr_line.cap = dr_linecaps.get(st.get('casing-linecap', 'butt'), BUTTCAP)
                             dr_line.join = dr_linejoins.get(st.get('casing-linejoin', 'round'), ROUNDJOIN)
