@@ -40,7 +40,7 @@ def make_nice_style(r):
                 ra[a] = colorparser(b)
             elif b:
                 ra[a] = b
-        elif any(x in a for x in ("width", "z-index", "opacity", "offset", "radius", "extrude")):
+        elif any(x in a for x in ("width", "opacity", "offset", "radius", "extrude")):
             "these things are float's or not in table at all"
             try:
                 ra[a] = float(b)
