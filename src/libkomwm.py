@@ -182,100 +182,73 @@ def query_style(args):
             results.append((cl, zoom, runtime_conditions, list(zstyle.values())))
     return results
 
-def apply_min_visible_scale(dr_zooms, maxzoom):
-    # Determine minVisibleScale for overlays only, i.e. disregarding lines and areas visibility.
-    def get_overlays_min_visible_scale(dr_zooms):
-        for drz in dr_zooms:
-            for dr in chain((drz.caption, drz.symbol, drz.path_text, drz.shield, drz.circle)):
-                if dr.priority:
-                    return drz.scale
-        return None
-
-    overlays_min_visible_scale = get_overlays_min_visible_scale(dr_zooms)
-    if overlays_min_visible_scale is None:
-        return
-
-    # Inverse minVisibleScale (lower scale means higher priority).
-    min_visible_scale_adjustment = maxzoom - overlays_min_visible_scale
-    # Overlays priorities range is [15000, 17000), make it [0, 2000)
-    # and add 10000 per zoom level, the final range is [0, 182000).
-    min_visible_scale_adjustment = -15000 + min_visible_scale_adjustment * 10000
-    for drz in dr_zooms:
-        for dr in chain((drz.caption, drz.symbol, drz.path_text, drz.shield, drz.circle)):
-            if dr.priority:
-                if dr.priority < 15000 or dr.priority >= 17000:
-                    print("WARNING: overlay priority out of range: ", dr.priority)
-                dr.priority += min_visible_scale_adjustment
-
 def get_priorities_filename(prio_range, path):
     return os.path.join(path, f'priorities_{prio_ranges[prio_range]["pos"]}_{prio_range}.prio.txt')
 
-def dump_priorities(prio_range, path):
-    outfile = open(get_priorities_filename(prio_range, path), 'w')
-    comment = COMMENT_AUTOFORMAT + prio_ranges[prio_range]['comment'] + COMMENT_RANGES_OVERVIEW
-    for s in comment.splitlines():
-        outfile.write(f'# {s}'.strip() + '\n')
-    outfile.write('\n')
-    for dr_id in sorted(prio_ranges[prio_range]['priorities'].keys(), key = lambda k: (OVERLAYS_MAX_PRIORITY - k[0], k[1], k[2], k[3])):
-        # (priority, dr_cont.name, dr_object_id, dr_type_name)
-        priority_key = dr_id[3]
-        if priority_key == 'symbol':
-            priority_key = 'icon'
-        # TODO: add zoom ranges support?
-        output = f'{dr_id[1]}\t{priority_key}{dr_id[2]}\t{dr_id[0]}\n'
-        outfile.write(output)
-    outfile.close()
+def load_priorities(prio_range, path, classif):
+    def print_warning(msg):
+        print(f'WARNING: {msg} in {fname}:\n\t{line}')
 
-dr_unique = set()
-def store_priorities(dr_cont, dr_lines_objects):
-    for drz in dr_cont.element:
-        for dr in chain(drz.lines, (drz.area, drz.caption, drz.symbol, drz.path_text, drz.shield, drz.circle)):
-            if dr.priority:
-                dr_type_name = dr.DESCRIPTOR.name
-                dr_type_name = dr_type_name[:dr_type_name.find('RuleProto')].lower()
-
-                priority = dr.priority
-                dr_object_id = ''
-                prio_range = PRIO_OVERLAYS
-                priority_max = OVERLAYS_MAX_PRIORITY
-                if dr_type_name == 'line' or dr_type_name == 'area':
-                    priority_max = PRIORITY_RANGE
-                    if dr_type_name == 'line':
-                        dr_object_id = dr_lines_objects[priority]
-                        if dr_object_id == CASING_OBJECT_ID:
-                            priority += 1
-                            dr_object_id = ''
-                    if priority >= prio_ranges[PRIO_FG]['base']:
-                        prio_range = PRIO_FG
-                    elif priority >= prio_ranges[PRIO_BG_TOP]['base']:
-                        prio_range = PRIO_BG_TOP
-                    else:
-                        prio_range = PRIO_BG_BY_SIZE
-                priority -= prio_ranges[prio_range]['base']
-
-                dr_id = (priority, dr_cont.name, dr_object_id, dr_type_name)
-                if priority < 0 or priority > priority_max:
-                    print('WARNING: priority {} for drule "{}{}" ({}) out of range'.format(*dr_id))
-
-                if dr_id in prio_ranges[prio_range]['priorities']:
-                    prio_ranges[prio_range]['priorities'][dr_id].add(drz.scale)
+    priority_max = OVERLAYS_MAX_PRIORITY if prio_range == PRIO_OVERLAYS else PRIORITY_RANGE
+    fname = get_priorities_filename(prio_range, path)
+    with open(fname, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            tokens = line.split()
+            if len(tokens) != 3:
+                print_warning('skipping malformed line')
+                continue
+            if tokens[0] not in classif:
+                print_warning('unknown classificator type')
+            if tokens[1].split('::')[0] not in ('icon', 'caption', 'pathtext', 'shield', 'line', 'area'):
+                print_warning('unknown drule type')
+            key = (tokens[0], tokens[1])
+            if key in prio_ranges[prio_range]['priorities']:
+                print_warning(f'duplicate priority (previous value {prio_ranges[prio_range]["priorities"][key]})')
+            try: 
+                priority = int(tokens[2])
+            except ValueError:
+                print_warning('skipping invalid priority value')
+            else:
+                if priority >= 0 and priority < priority_max:
+                    prio_ranges[prio_range]['priorities'][key] = priority
                 else:
-                    prio_ranges[prio_range]['priorities'][dr_id] = set([drz.scale])
+                    print_warning(f'skipping out of [0;{priority_max}) range priority value')
 
-                    # TODO: add zoom ranges support?
-                    dr_id_unique = dr_id[1:]
-                    if dr_id_unique in dr_unique:
-                        print('WARNING: multiple priorities for drule "{}{}" ({})'.format(*dr_id_unique))
-                    else:
-                        dr_unique.add(dr_id_unique)
+def dump_priorities(prio_range, path):
+    # TODO : clamp overlays prios?
+    with open(get_priorities_filename(prio_range, path), 'w') as outfile:
+        comment = COMMENT_AUTOFORMAT + prio_ranges[prio_range]['comment'] + COMMENT_RANGES_OVERVIEW
+        for s in comment.splitlines():
+            outfile.write(f'# {s}'.strip() + '\n')
+        outfile.write('\n')
+
+        for dr in sorted(prio_ranges[prio_range]['priorities'].items(), key = lambda item: (OVERLAYS_MAX_PRIORITY - item[1], item[0][0], item[0][1])):
+            # TODO: add zoom ranges support?
+            outfile.write(f'{dr[0][0]}\t{dr[0][1]}\t{dr[1]}\n')
+
+def get_drape_priority(cl, dr_type, object_id):
+    if object_id == '::default':
+        object_id = ''
+    prio_id = (cl, dr_type + object_id)
+    ranges_to_check = (PRIO_OVERLAYS, )
+    if dr_type == 'line':
+        ranges_to_check = (PRIO_FG, PRIO_BG_TOP)
+    elif dr_type == 'area':
+        ranges_to_check = (PRIO_BG_BY_SIZE, PRIO_BG_TOP, PRIO_FG)
+    for r in ranges_to_check:
+        if prio_id in prio_ranges[r]['priorities']:
+            return prio_ranges[r]['priorities'][prio_id] + prio_ranges[r]['base']
+    print(f'WARNING: priority is not set for {prio_id}')
+    return 0
 
 def komap_mapswithme(options):
     if options.data and os.path.isdir(options.data):
         ddir = options.data
     else:
         ddir = os.path.dirname(options.outfile)
-
-    is_dump_priorities = options.priorities_path and os.path.isdir(options.priorities_path)
 
     classificator = {}
     class_order = []
@@ -356,6 +329,14 @@ def komap_mapswithme(options):
     class_order.sort()
     types_file.close()
 
+    output = ''
+    for prio_range in prio_ranges.keys():
+        load_priorities(prio_range, options.priorities_path, unique_types_check)
+        output += f'{"" if not output else ", "}{len(prio_ranges[prio_range]["priorities"])} {prio_range}'
+    print(f'Loaded priorities: {output}.')
+
+    del unique_types_check
+
     # Get all mapcss static tags which are used in mapcss-mapping.csv
     # This is a dict with main_tag flags (True = appears first in types)
     mapcss_static_tags = {}
@@ -369,7 +350,7 @@ def komap_mapswithme(options):
     # Parse style mapcss
     global style
     style = MapCSS(options.minzoom, options.maxzoom)
-    style.parse(clamp=True, stretch=PRIORITY_RANGE,
+    style.parse(clamp=False, stretch=PRIORITY_RANGE,
                 filename=options.filename, static_tags=mapcss_static_tags,
                 dynamic_tags=mapcss_dynamic_tags)
 
@@ -438,7 +419,7 @@ def komap_mapswithme(options):
                             first = 1
                         if str(dict_.get('text')) == 'none':
                             first = 2
-                    return (first, int(dict_.get('z-index', 0)))
+                    return (first, dict_.get('object-id'))
 
                 zstyle.sort(key = rule_sort_key)
 
@@ -449,9 +430,6 @@ def komap_mapswithme(options):
 
                 if dr_cont is not None and dr_cont.name != cl:
                     if dr_cont.element:
-                        apply_min_visible_scale(dr_cont.element, options.maxzoom)
-                        if is_dump_priorities:
-                            store_priorities(dr_cont, dr_lines_objects)
                         drules.cont.extend([dr_cont])
                     visibility["world|" + class_tree[dr_cont.name] + "|"] = "".join(visstring)
                     dr_cont = None
@@ -503,10 +481,12 @@ def komap_mapswithme(options):
                         dr_element.apply_if.append(str(rc))
 
                 for st in zstyle:
+                    '''
                     if st.get('-x-kot-layer') == 'top':
                         st['z-index'] = float(st.get('z-index', 0)) + 15001.
                     elif st.get('-x-kot-layer') == 'bottom':
                         st['z-index'] = float(st.get('z-index', 0)) - 15001.
+                    '''
 
                     if st.get('casing-width') not in (None, 0) or st.get('casing-width-add') is not None:  # and (st.get('width') or st.get('fill-color')):
                         is_area_st = 'fill-color' in st
@@ -527,18 +507,18 @@ def komap_mapswithme(options):
 
                             dr_line.width = round((base_width + st.get('casing-width') * 2) * WIDTH_SCALE, 2)
                             dr_line.color = mwm_encode_color(colors, st, "casing")
-                            # Casing line should be rendered below the "main" line, hence priority -1.
-                            if st.get('fill-position', 'foreground') == 'background-top':
-                                dr_line.priority = max(int(st.get('z-index', 0)) - 1 + prio_ranges[PRIO_BG_TOP]['base'], prio_ranges[PRIO_BG_TOP]['base'])
-                            else:
-                                dr_line.priority = max(int(st.get('z-index', 0)) - 1 + prio_ranges[PRIO_FG]['base'], prio_ranges[PRIO_FG]['base'])
+                            dr_line.priority = get_drape_priority(cl, 'line', st.get('object-id'))
+                            # Casing line should be rendered below the "main" line, hence priority -1 (but not less than base).
+                            if (st.get('object-id') == '::default' and dr_line.priority != 0 and
+                                dr_line.priority != prio_ranges[PRIO_FG]['base'] and
+                                dr_line.priority != prio_ranges[PRIO_BG_TOP]['base']):
+                                    dr_line.priority -= 1
                             for i in st.get('casing-dashes', st.get('dashes', [])):
                                 dr_line.dashdot.dd.extend([max(float(i), 1) * WIDTH_SCALE])
                             addPattern(dr_line.dashdot.dd)
                             dr_line.cap = dr_linecaps.get(st.get('casing-linecap', 'butt'), BUTTCAP)
                             dr_line.join = dr_linejoins.get(st.get('casing-linejoin', 'round'), ROUNDJOIN)
                             dr_element.lines.extend([dr_line])
-                            dr_lines_objects[dr_line.priority] = st.get('object-id') if st.get('object-id') != '::default' else CASING_OBJECT_ID
 
                         if has_fills and is_area_st and float(st.get('fill-opacity', 1)) > 0:
                             dr_element.area.border.color = mwm_encode_color(colors, st, "casing")
@@ -566,12 +546,8 @@ def komap_mapswithme(options):
                             addPattern(dr_line.dashdot.dd)
                             dr_line.cap = dr_linecaps.get(st.get('linecap', 'butt'), BUTTCAP)
                             dr_line.join = dr_linejoins.get(st.get('linejoin', 'round'), ROUNDJOIN)
-                            if st.get('fill-position', 'foreground') == 'background-top':
-                                dr_line.priority = int(st.get('z-index', 0)) + prio_ranges[PRIO_BG_TOP]['base']
-                            else:
-                                dr_line.priority = int(st.get('z-index', 0)) + prio_ranges[PRIO_FG]['base']
+                            dr_line.priority = get_drape_priority(cl, 'line', st.get('object-id'))
                             dr_element.lines.extend([dr_line])
-                            dr_lines_objects[dr_line.priority] = st.get('object-id') if st.get('object-id') != '::default' else ''
                         if st.get('pattern-image'):
                             dr_line = LineRuleProto()
                             dr_line.width = 0
@@ -580,12 +556,9 @@ def komap_mapswithme(options):
                             dr_line.pathsym.name = icon[0]
                             dr_line.pathsym.step = float(st.get('pattern-spacing', 0)) - 16
                             dr_line.pathsym.offset = st.get('pattern-offset', 0)
-                            if st.get('fill-position', 'foreground') == 'background-top':
-                                dr_line.priority = int(st.get('z-index', 0)) + prio_ranges[PRIO_BG_TOP]['base']
-                            else:
-                                dr_line.priority = int(st.get('z-index', 0)) + prio_ranges[PRIO_FG]['base']
+                            dr_line.priority = get_drape_priority(cl, 'line', st.get('object-id'))
                             dr_element.lines.extend([dr_line])
-                            dr_lines_objects[dr_line.priority] = st.get('object-id') if st.get('object-id') != '::default' else ''
+
                         if st.get('shield-font-size'):
                             dr_element.shield.height = int(st.get('shield-font-size', 10))
                             dr_element.shield.text_color = mwm_encode_color(colors, st, "shield-text")
@@ -594,10 +567,7 @@ def komap_mapswithme(options):
                             dr_element.shield.color = mwm_encode_color(colors, st, "shield")
                             if st.get('shield-outline-radius', 0) != 0:
                                 dr_element.shield.stroke_color = mwm_encode_color(colors, st, "shield-outline", "white")
-                            if '-x-me-shield-priority' in st:
-                                dr_element.shield.priority = int(st.get('-x-me-shield-priority'))
-                            else:
-                                dr_element.shield.priority = min(19100, (16000 + int(st.get('z-index', 0))))
+                            dr_element.shield.priority = get_drape_priority(cl, 'shield', st.get('object-id'))
                             if st.get('shield-min-distance', 0) != 0:
                                 dr_element.shield.min_distance = int(st.get('shield-min-distance', 0))
 
@@ -605,20 +575,15 @@ def komap_mapswithme(options):
                         if st.get('icon-image'):
                             icon = mwm_encode_image(st)
                             dr_element.symbol.name = icon[0]
-                            if '-x-me-icon-priority' in st:
-                                dr_element.symbol.priority = int(st.get('-x-me-icon-priority'))
-                            else:
-                                dr_element.symbol.priority = min(19100, (16000 + int(st.get('z-index', 0))))
+                            dr_element.symbol.priority = get_drape_priority(cl, 'icon', st.get('object-id'))
                             if 'icon-min-distance' in st:
                                 dr_element.symbol.min_distance = int(st.get('icon-min-distance', 0))
                             has_icons = False
                         if st.get('symbol-shape'):
+                            # TODO: not used in current styles; do "circles" work in drape at all?
                             dr_element.circle.radius = float(st.get('symbol-size'))
                             dr_element.circle.color = mwm_encode_color(colors, st, 'symbol-fill')
-                            if '-x-me-symbol-priority' in st:
-                                dr_element.circle.priority = int(st.get('-x-me-symbol-priority'))
-                            else:
-                                dr_element.circle.priority = min(19000, (14000 + int(st.get('z-index', 0))))
+                            dr_element.circle.priority = get_drape_priority(cl, 'circle', st.get('object-id'))
                             has_icons = False
 
                     if has_text and st.get('text') and st.get('text') != 'none':
@@ -626,10 +591,10 @@ def komap_mapswithme(options):
                         has_text = has_text[:2]
 
                         dr_text = dr_element.caption
-                        base_z = 15000
+                        text_priority_key = 'caption'
                         if st.get('text-position', 'center') == 'line':
                             dr_text = dr_element.path_text
-                            base_z = 16000
+                            text_priority_key = 'pathtext'
 
                         dr_cur_subtext = dr_text.primary
                         for sp in has_text:
@@ -655,13 +620,7 @@ def komap_mapswithme(options):
                             dr_cur_subtext = dr_text.secondary
 
                         #  Priority is assigned from the first (primary) rule.
-                        if '-x-me-text-priority' in st:
-                            dr_text.priority = int(st.get('-x-me-text-priority'))
-                        else:
-                            dr_text.priority = min(19000, (base_z + int(st.get('z-index', 0))))
-                        if '-x-me-min-text-priority' in st:
-                            min_priority = int(st.get('-x-me-min-text-priority'))
-                            dr_text.priority = max(min_priority, dr_text.priority)
+                        dr_text.priority = get_drape_priority(cl, text_priority_key, st.get('object-id'))
 
                         # Process captions block once.
                         has_text = None
@@ -669,13 +628,7 @@ def komap_mapswithme(options):
                     if has_fills:
                         if ('fill-color' in st) and (float(st.get('fill-opacity', 1)) > 0):
                             dr_element.area.color = mwm_encode_color(colors, st, "fill")
-                            dr_element.area.priority = int(st.get('z-index', 0))
-                            if st.get('fill-position', 'foreground') == 'background':
-                                dr_element.area.priority += prio_ranges[PRIO_BG_BY_SIZE]['base']
-                            elif (st.get('fill-position', 'foreground') == 'background-top'):
-                                dr_element.area.priority += prio_ranges[PRIO_BG_TOP]['base']
-                            else:
-                                dr_element.area.priority += prio_ranges[PRIO_FG]['base']
+                            dr_element.area.priority = get_drape_priority(cl, 'area', st.get('object-id'))
                             has_fills = False
 
                 str_dr_element = dr_cont.name + "/" + str(dr_element)
@@ -685,18 +638,16 @@ def komap_mapswithme(options):
 
     if dr_cont is not None:
         if dr_cont.element:
-            apply_min_visible_scale(dr_cont.element, options.maxzoom)
-            if is_dump_priorities:
-                store_priorities(dr_cont, dr_lines_objects)
             drules.cont.extend([dr_cont])
 
         visibility["world|" + class_tree[cl] + "|"] = "".join(visstring)
 
-    if is_dump_priorities:
-        dump_priorities(PRIO_OVERLAYS, options.priorities_path)
-        dump_priorities(PRIO_FG, options.priorities_path)
-        dump_priorities(PRIO_BG_TOP, options.priorities_path)
-        dump_priorities(PRIO_BG_BY_SIZE, options.priorities_path)
+
+    output = ''
+    for prio_range in prio_ranges.keys():
+        dump_priorities(prio_range, options.priorities_path)
+        output += f'{"" if not output else ", "}{len(prio_ranges[prio_range]["priorities"])} {prio_range}'
+    print(f'Re-formated priorities files: {output}.')
 
     # Write drules_proto.bin and drules_proto.txt files
 
@@ -773,8 +724,8 @@ def main():
                       help="output filename", metavar="FILE")
     parser.add_option("-x", "--txt", dest="txt", action="store_true",
                       help="create a text file for output", default=False)
-    parser.add_option("-p", "--priorities-out-path", dest="priorities_path",
-                      help="path to write priorities files to", metavar="PATH")
+    parser.add_option("-p", "--priorities-path", dest="priorities_path",
+                      help="path to priorities *.prio.txt files", metavar="PATH")
     parser.add_option("-d", "--data-path", dest="data",
                       help="path to mapcss-mapping.csv and other files", metavar="PATH")
 
@@ -785,6 +736,10 @@ def main():
 
     if options.outfile == "-":
         parser.error("Please specify base output path.")
+
+    if (options.priorities_path is None or not os.path.isdir(options.priorities_path)):
+        parser.error("A path to priorities *.prio.txt files is required.")
+    options.priorities_path = os.path.normpath(options.priorities_path)
 
     komap_mapswithme(options)
 
