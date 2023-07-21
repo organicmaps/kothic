@@ -185,7 +185,7 @@ def query_style(args):
 def get_priorities_filename(prio_range, path):
     return os.path.join(path, f'priorities_{prio_ranges[prio_range]["pos"]}_{prio_range}.prio.txt')
 
-def load_priorities(prio_range, path, classif):
+def load_priorities(prio_range, path, classif, compress = False):
     def print_warning(msg):
         print(f'WARNING: {msg} in {fname}:\n\t{line}')
 
@@ -217,8 +217,24 @@ def load_priorities(prio_range, path, classif):
                 else:
                     print_warning(f'skipping out of [0;{priority_max}) range priority value')
 
+    if compress:
+        print(f'Compressing {prio_range} priorities into a (0;{priority_max}) range:')
+        unique_prios = set(prio_ranges[prio_range]['priorities'].values())
+        print(f'\tunique priorities values: {len(unique_prios)}')
+        # Keep gaps at the range borders.
+        base_idx = 1
+        if 0 not in unique_prios:
+            base_idx = 0
+            unique_prios.add(0)
+        unique_prios.add(priority_max)
+        step = min(priority_max / len(unique_prios), 10)
+        print(f'\tnew step between priorities: {step}')
+        unique_prios = sorted(unique_prios)
+        for prio_id in prio_ranges[prio_range]['priorities'].keys():
+            idx = unique_prios.index(prio_ranges[prio_range]['priorities'][prio_id])
+            prio_ranges[prio_range]['priorities'][prio_id] = int(step * (base_idx + idx))
+
 def dump_priorities(prio_range, path):
-    # TODO : clamp overlays prios?
     with open(get_priorities_filename(prio_range, path), 'w') as outfile:
         comment = COMMENT_AUTOFORMAT + prio_ranges[prio_range]['comment'] + COMMENT_RANGES_OVERVIEW
         for s in comment.splitlines():
@@ -331,7 +347,7 @@ def komap_mapswithme(options):
 
     output = ''
     for prio_range in prio_ranges.keys():
-        load_priorities(prio_range, options.priorities_path, unique_types_check)
+        load_priorities(prio_range, options.priorities_path, unique_types_check, compress = True)
         output += f'{"" if not output else ", "}{len(prio_ranges[prio_range]["priorities"])} {prio_range}'
     print(f'Loaded priorities: {output}.')
 
