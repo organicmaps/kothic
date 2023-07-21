@@ -92,9 +92,7 @@ Priorities ranges' rendering order overview:
 - BG-by-size: landcover areas sorted by their size
 '''
 
-OVERLAYS_MAX_PRIORITY = 200000
-
-CASING_OBJECT_ID = '_casing'
+OVERLAYS_MAX_PRIORITY = 100000
 
 def to_boolean(s):
     s = s.lower()
@@ -347,7 +345,7 @@ def komap_mapswithme(options):
 
     output = ''
     for prio_range in prio_ranges.keys():
-        load_priorities(prio_range, options.priorities_path, unique_types_check, compress = True)
+        load_priorities(prio_range, options.priorities_path, unique_types_check, compress = False)
         output += f'{"" if not output else ", "}{len(prio_ranges[prio_range]["priorities"])} {prio_range}'
     print(f'Loaded priorities: {output}.')
 
