@@ -215,6 +215,18 @@ def load_priorities(prio_range, path, classif, compress = False):
                 else:
                     print_warning(f'skipping out of [0;{priority_max}) range priority value')
 
+    for key in prio_ranges[PRIO_OVERLAYS]['priorities'].keys():
+        main_prio_id = None
+        if key[1].startswith('caption'):
+            main_prio_id = (key[0], key[1].replace('caption', 'icon'))
+        if key[1].startswith('pathtext'):
+            main_prio_id = (key[0], key[1].replace('pathtext', 'shield'))
+        if main_prio_id is not None and main_prio_id in prio_ranges[PRIO_OVERLAYS]['priorities']:
+            main_prio = prio_ranges[PRIO_OVERLAYS]['priorities'][main_prio_id]
+            if prio_ranges[PRIO_OVERLAYS]['priorities'][key] > main_prio:
+                print(f'WARNING: {key} priority is higher than {main_prio_id}, making it equal')
+                prio_ranges[PRIO_OVERLAYS]['priorities'][key] = main_prio
+
     if compress:
         print(f'Compressing {prio_range} priorities into a (0;{priority_max}) range:')
         unique_prios = set(prio_ranges[prio_range]['priorities'].values())
