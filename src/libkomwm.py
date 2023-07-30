@@ -94,7 +94,7 @@ Priorities ranges' rendering order overview:
 - BG-by-size: landcover areas sorted by their size
 '''
 
-OVERLAYS_MAX_PRIORITY = 100000
+OVERLAYS_MAX_PRIORITY = 10000
 
 def to_boolean(s):
     s = s.lower()
@@ -232,17 +232,18 @@ def load_priorities(prio_range, path, classif, compress = False):
             line = group
             print_warning(f'skipping last types groups with no priority set')
 
-    for key in prio_ranges[PRIO_OVERLAYS]['priorities'].keys():
-        main_prio_id = None
-        if key[1].startswith('caption'):
-            main_prio_id = (key[0], key[1].replace('caption', 'icon'))
-        if key[1].startswith('pathtext'):
-            main_prio_id = (key[0], key[1].replace('pathtext', 'shield'))
-        if main_prio_id is not None and main_prio_id in prio_ranges[PRIO_OVERLAYS]['priorities']:
-            main_prio = prio_ranges[PRIO_OVERLAYS]['priorities'][main_prio_id]
-            if prio_ranges[PRIO_OVERLAYS]['priorities'][key] > main_prio:
-                print(f'WARNING: {key} priority is higher than {main_prio_id}, making it equal')
-                prio_ranges[PRIO_OVERLAYS]['priorities'][key] = main_prio
+    if prio_range == PRIO_OVERLAYS:
+        for key in prio_ranges[PRIO_OVERLAYS]['priorities'].keys():
+            main_prio_id = None
+            if key[1].startswith('caption'):
+                main_prio_id = (key[0], key[1].replace('caption', 'icon'))
+            if key[1].startswith('pathtext'):
+                main_prio_id = (key[0], key[1].replace('pathtext', 'shield'))
+            if main_prio_id is not None and main_prio_id in prio_ranges[PRIO_OVERLAYS]['priorities']:
+                main_prio = prio_ranges[PRIO_OVERLAYS]['priorities'][main_prio_id]
+                if prio_ranges[PRIO_OVERLAYS]['priorities'][key] > main_prio:
+                    print(f'WARNING: {key} priority is higher than {main_prio_id}, making it equal')
+                    prio_ranges[PRIO_OVERLAYS]['priorities'][key] = main_prio
 
     if compress:
         print(f'Compressing {prio_range} priorities into a (0;{priority_max}) range:')
@@ -342,6 +343,7 @@ def get_drape_priority(cl, dr_type, object_id):
     if object_id == '::default':
         object_id = ''
     prio_id = (cl, dr_type + object_id)
+
     ranges_to_check = (PRIO_OVERLAYS, )
     if dr_type == 'line':
         ranges_to_check = (PRIO_FG, PRIO_BG_TOP)
@@ -350,6 +352,7 @@ def get_drape_priority(cl, dr_type, object_id):
     for r in ranges_to_check:
         if prio_id in prio_ranges[r]['priorities']:
             return prio_ranges[r]['priorities'][prio_id] + prio_ranges[r]['base']
+
     print(f'WARNING: priority is not set for {prio_id}')
     return 0
 
@@ -724,13 +727,25 @@ def komap_mapswithme(options):
                                     dr_cur_subtext.is_optional = value
                                 else:
                                     dr_cur_subtext.is_optional = True
-                            elif st.get('text-position', 'center') == 'center' and dr_element.symbol.priority:
+                            elif text_priority_key == 'caption' and dr_element.symbol.priority:
                                 # On by default for all captions (not path texts) with icons.
                                 dr_cur_subtext.is_optional = True
                             dr_cur_subtext = dr_text.secondary
 
-                        #  Priority is assigned from the first (primary) rule.
-                        dr_text.priority = get_drape_priority(cl, text_priority_key, st.get('object-id'))
+                        if text_priority_key == 'caption' and dr_element.symbol.priority:
+                            # Mandatory captions with icons use icon's priority.
+                            dr_text.priority = get_drape_priority(cl, 'icon', st.get('object-id'))
+                            # Optional captions (with icons) are automatically placed below all other overlays.
+                            if dr_text.primary.is_optional:
+                                dr_text.priority -= OVERLAYS_MAX_PRIORITY
+
+                            oid = '' if st.get('object-id') == '::default' else st.get('object-id')
+                            cap_prio_id = (cl, 'caption' + oid)
+                            if cap_prio_id in prio_ranges[PRIO_OVERLAYS]['priorities']:
+                                del prio_ranges[PRIO_OVERLAYS]['priorities'][cap_prio_id]
+                        else:
+                            dr_text.priority = get_drape_priority(cl, text_priority_key, st.get('object-id'))
+
                         store_visibility(cl, text_priority_key, st.get('object-id'), zoom)
 
                         # Process captions block once.
