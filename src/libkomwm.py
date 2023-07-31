@@ -251,9 +251,19 @@ def dump_priorities(prio_range, path):
             outfile.write(f'# {s}'.strip() + '\n')
         outfile.write('\n')
 
-        for dr in sorted(prio_ranges[prio_range]['priorities'].items(), key = lambda item: (OVERLAYS_MAX_PRIORITY - item[1], item[0][0], item[0][1])):
-            # TODO: add zoom ranges support?
-            outfile.write(f'{dr[0][0]}\t{dr[0][1]}\t{dr[1]}\n')
+        if len(prio_ranges[prio_range]['priorities']):
+            prios = sorted(prio_ranges[prio_range]['priorities'].items(),
+                           key = lambda item: (OVERLAYS_MAX_PRIORITY - item[1], item[0][0], item[0][1]))
+            group_prio = prios[0][1]
+            group = ''
+            for p in prios:
+                if p[1] != group_prio:
+                    outfile.write(f'{group}=== {group_prio}\n\n')
+                    group_prio = p[1]
+                    group = ''
+                # TODO: add zoom ranges support?
+                group += f'{p[0][0]}\t{p[0][1]}\n'
+            outfile.write(f'{group}=== {group_prio}\n')
 
 def get_drape_priority(cl, dr_type, object_id):
     if object_id == '::default':
