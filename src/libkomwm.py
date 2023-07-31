@@ -190,30 +190,43 @@ def load_priorities(prio_range, path, classif, compress = False):
     priority_max = OVERLAYS_MAX_PRIORITY if prio_range == PRIO_OVERLAYS else PRIORITY_RANGE
     fname = get_priorities_filename(prio_range, path)
     with open(fname, 'r') as f:
+        group = []
         for line in f:
             line = line.strip()
             if not line or line.startswith('#'):
                 continue
             tokens = line.split()
-            if len(tokens) != 3:
+            if len(tokens) != 2:
                 print_warning('skipping malformed line')
                 continue
-            if tokens[0] not in classif:
-                print_warning('unknown classificator type')
-            if tokens[1].split('::')[0] not in ('icon', 'caption', 'pathtext', 'shield', 'line', 'area'):
-                print_warning('unknown drule type')
-            key = (tokens[0], tokens[1])
-            if key in prio_ranges[prio_range]['priorities']:
-                print_warning(f'duplicate priority (previous value {prio_ranges[prio_range]["priorities"][key]})')
-            try: 
-                priority = int(tokens[2])
-            except ValueError:
-                print_warning('skipping invalid priority value')
-            else:
-                if priority >= 0 and priority < priority_max:
-                    prio_ranges[prio_range]['priorities'][key] = priority
+            if tokens[0] == "===":
+                try:
+                    priority = int(tokens[1])
+                except ValueError:
+                    print_warning('skipping invalid priority value')
                 else:
-                    print_warning(f'skipping out of [0;{priority_max}) range priority value')
+                    if priority >= 0 and priority < priority_max:
+                        if len(group):
+                            for key in group:
+                                prio_ranges[prio_range]['priorities'][key] = priority
+                        else:
+                            print_warning('skipping empty priority group')
+                    else:
+                        print_warning(f'skipping out of [0;{priority_max}) range priority value')
+                group = []
+            else:
+                if tokens[0] not in classif:
+                    print_warning('unknown classificator type')
+                if tokens[1].split('::')[0] not in ('icon', 'caption', 'pathtext', 'shield', 'line', 'area'):
+                    print_warning('unknown drule type')
+                key = (tokens[0], tokens[1])
+                if key in prio_ranges[prio_range]['priorities']:
+                    print_warning(f'duplicate priority (previous value {prio_ranges[prio_range]["priorities"][key]})')
+                group.append(key)
+
+        if len(group):
+            line = group
+            print_warning(f'skipping last types groups with no priority set')
 
     for key in prio_ranges[PRIO_OVERLAYS]['priorities'].keys():
         main_prio_id = None
