@@ -200,7 +200,7 @@ def load_priorities(prio_range, path, classif, compress = False):
             if not line:
                 continue
             tokens = line.split()
-            if len(tokens) != 2:
+            if len(tokens) > 2:
                 print_warning('skipping malformed line')
                 continue
             if tokens[0] == "===":
@@ -219,13 +219,17 @@ def load_priorities(prio_range, path, classif, compress = False):
                         print_warning(f'skipping out of [0;{priority_max}) range priority value')
                 group = []
             else:
-                if tokens[0] not in classif:
+                cl = tokens[0]
+                object_id = ''
+                oid_pos = cl.find('::')
+                if oid_pos != -1:
+                    object_id = cl[oid_pos:]
+                    cl = cl[0:oid_pos]
+                if cl not in classif:
                     print_warning('unknown classificator type')
-                if tokens[1].split('::')[0] not in ('icon', 'caption', 'pathtext', 'shield', 'line', 'area'):
-                    print_warning('unknown drule type')
-                key = (tokens[0], tokens[1])
+                key = (cl, object_id)
                 if key in prio_ranges[prio_range]['priorities']:
-                    print_warning(f'duplicate priority (previous value {prio_ranges[prio_range]["priorities"][key]})')
+                    print_warning(f'overriding previously set priority value {prio_ranges[prio_range]["priorities"][key]}')
                 group.append(key)
 
         if len(group):
@@ -264,12 +268,15 @@ def load_priorities(prio_range, path, classif, compress = False):
 
 
 def store_visibility(cl, dr_type, object_id, zoom):
-    dr_id = dr_type if object_id == '::default' else dr_type + object_id
+    if object_id == '::default':
+        object_id = ''
     if cl not in visibilities:
         visibilities[cl] = {}
-    if dr_id not in visibilities[cl]:
-        visibilities[cl][dr_id] = set()
-    visibilities[cl][dr_id].add(zoom)
+    if dr_type not in visibilities[cl]:
+        visibilities[cl][dr_type] = {}
+    if object_id not in visibilities[cl][dr_type]:
+        visibilities[cl][dr_type][object_id] = set()
+    visibilities[cl][dr_type][object_id].add(zoom)
 
 
 def dump_priorities(prio_range, path, maxzoom):
@@ -319,34 +326,46 @@ def dump_priorities(prio_range, path, maxzoom):
                     outfile.write(f'{group}=== {group_prio}\n\n')
                     group_prio = p[1]
                     group = ''
-                drule_zooms = ''
+                cl = p[0][0]
+                object_id = p[0][1]
+
+                line_drules = ''
                 other_drules = ''
-                if p[0][0] in visibilities:
-                    for dr_id in sorted(visibilities[p[0][0]].keys()):
-                        zoom_range = prettify_zooms(visibilities[p[0][0]][dr_id], maxzoom)
-                        if dr_id == p[0][1]:
-                            drule_zooms = zoom_range
-                        else:
-                            if other_drules:
-                                other_drules += ', '
-                            other_drules += dr_id + ' ' + zoom_range
+                if cl in visibilities:
+                    for dr_type in sorted(visibilities[cl].keys()):
+                        for oid in sorted(visibilities[cl][dr_type].keys()):
+                            dr_zoom = dr_type + oid if oid else dr_type
+                            dr_zoom += ' ' + prettify_zooms(visibilities[cl][dr_type][oid], maxzoom)
+                            # Drules matching this prio_range and object_id.
+                            if (oid == object_id and
+                                ((prio_range == PRIO_OVERLAYS and dr_type in ('icon', 'caption', 'shield', 'pathtext')) or
+                                 (prio_range in (PRIO_FG, PRIO_BG_TOP) and dr_type in ('line', 'area')) or
+                                 (prio_range == PRIO_BG_BY_SIZE and dr_type == 'area'))):
+                                    if line_drules:
+                                        line_drules += ' and '
+                                    line_drules += dr_zoom
+                            else:
+                                # Drules from other prio_ranges or with other object_ids.
+                                if other_drules:
+                                    other_drules += ', '
+                                other_drules += dr_zoom
+                if object_id:
+                    cl += object_id
+                if not line_drules:
+                    print(f'WARNING: priority is defined, but no drules for {cl}')
+
                 info = ''
-                if drule_zooms or other_drules:
-                    info = f' # {drule_zooms}'
+                if line_drules or other_drules:
+                    info = f' # {line_drules}'
                     if other_drules:
                         info += f' (also has {other_drules})'
-                cl = p[0][0]
-                tokens = p[0][1].split('::')
-                if len(tokens) > 1:
-                    cl += f'::{tokens[1]}'
-                # TODO: add zoom ranges support?
                 group += f'{cl:50} {info}\n'
             outfile.write(f'{group}=== {group_prio}\n')
 
 def get_drape_priority(cl, dr_type, object_id):
     if object_id == '::default':
         object_id = ''
-    prio_id = (cl, dr_type + object_id)
+    prio_id = (cl, object_id)
 
     ranges_to_check = (PRIO_OVERLAYS, )
     if dr_type == 'line':
@@ -742,11 +761,6 @@ def komap_mapswithme(options):
                             # Optional captions (with icons) are automatically placed below all other overlays.
                             if dr_text.primary.is_optional:
                                 dr_text.priority -= OVERLAYS_MAX_PRIORITY
-
-                            oid = '' if st.get('object-id') == '::default' else st.get('object-id')
-                            cap_prio_id = (cl, 'caption' + oid)
-                            if cap_prio_id in prio_ranges[PRIO_OVERLAYS]['priorities']:
-                                del prio_ranges[PRIO_OVERLAYS]['priorities'][cap_prio_id]
                         else:
                             dr_text.priority = get_drape_priority(cl, text_priority_key, st.get('object-id'))
 
