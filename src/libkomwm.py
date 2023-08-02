@@ -335,8 +335,12 @@ def dump_priorities(prio_range, path, maxzoom):
                     info = f' # {drule_zooms}'
                     if other_drules:
                         info += f' (also has {other_drules})'
+                cl = p[0][0]
+                tokens = p[0][1].split('::')
+                if len(tokens) > 1:
+                    cl += f'::{tokens[1]}'
                 # TODO: add zoom ranges support?
-                group += f'{p[0][0]:40} {p[0][1]:10}{info}\n'
+                group += f'{cl:50} {info}\n'
             outfile.write(f'{group}=== {group_prio}\n')
 
 def get_drape_priority(cl, dr_type, object_id):
