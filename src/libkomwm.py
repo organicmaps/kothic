@@ -279,37 +279,52 @@ def store_visibility(cl, dr_type, object_id, zoom):
     visibilities[cl][dr_type][object_id].add(zoom)
 
 
+def prettify_zooms(zooms, maxzoom):
+
+    def add_zrange(first, prev, result, maxzoom):
+        first = str(first)
+        prev = str(prev)
+        if first == prev:
+            zrange = first
+        elif prev == str(maxzoom):
+            zrange = first + '-'
+        else:
+            zrange = first + '-' + prev
+        if result != '':
+            result += ','
+        result += zrange
+        return result
+
+    zooms = sorted(zooms)
+    first = zooms.pop(0)
+    prev = first
+    result = ''
+    for zoom in zooms:
+        if zoom == prev + 1:
+            prev = zoom
+        else:
+            result = add_zrange(first, prev, result, maxzoom)
+            first = zoom
+            prev = zoom
+    return 'z' + add_zrange(first, prev, result, maxzoom)
+
+
+def validate_visibilities(maxzoom):
+    for cl, dr_types in visibilities.items():
+        for dr_type, object_ids in dr_types.items():
+            for object_id, zooms in object_ids.items():
+                zoom_range = prettify_zooms(zooms, maxzoom)
+                if zoom_range.find(',') != -1:
+                    print(f'WARNING: non-contiguous visibility range {zoom_range} for {cl} {dr_type}{object_id}')
+
+                if dr_type == 'caption' and 'icon' in dr_types and object_id in dr_types['icon']:
+                    icon_zooms = sorted(dr_types['icon'][object_id])
+                    if sorted(zooms)[0] < icon_zooms[0]:
+                        print(f'WARNING: caption {zoom_range} appears before icon {prettify_zooms(icon_zooms, maxzoom)}'
+                              f' for {cl}{object_id}')
+
+
 def dump_priorities(prio_range, path, maxzoom):
-
-    def prettify_zooms(zooms, maxzoom):
-
-        def add_zrange(first, prev, result, maxzoom):
-            first = str(first)
-            prev = str(prev)
-            if first == prev:
-                zrange = first
-            elif prev == str(maxzoom):
-                zrange = first + '-'
-            else:
-                zrange = first + '-' + prev
-            if result != '':
-                result += ','
-            result += zrange
-            return result
-
-        zooms = sorted(zooms)
-        first = zooms.pop(0)
-        prev = first
-        result = ''
-        for zoom in zooms:
-            if zoom == prev + 1:
-                prev = zoom
-            else:
-                result = add_zrange(first, prev, result, maxzoom)
-                first = zoom
-                prev = zoom
-        return 'z' + add_zrange(first, prev, result, maxzoom)
-
     with open(get_priorities_filename(prio_range, path), 'w') as outfile:
         comment = COMMENT_AUTOFORMAT + prio_ranges[prio_range]['comment'] + COMMENT_RANGES_OVERVIEW
         for s in comment.splitlines():
@@ -545,8 +560,8 @@ def komap_mapswithme(options):
         for result in results:
                 cl, zoom, runtime_conditions, zstyle = result
 
-                # First, sort rules by 'object-id' in captions (primary, secondary, none ..);
-                # Then by 'z-index' in ascending order.
+                # First, sort rules by ::object-id in captions (primary, secondary, none ..)
+                # then by other ::object-id in ascending order.
                 def rule_sort_key(dict_):
                     first = 0
                     if dict_.get('text'):
@@ -787,6 +802,7 @@ def komap_mapswithme(options):
 
         visibility["world|" + class_tree[cl] + "|"] = "".join(visstring)
 
+    validate_visibilities(options.maxzoom)
 
     output = ''
     for prio_range in prio_ranges.keys():
