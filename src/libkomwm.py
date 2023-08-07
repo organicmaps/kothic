@@ -28,10 +28,9 @@ from drules_struct_pb2 import *
 
 WIDTH_SCALE = 1.0
 
-# z-index values defined in mapcss files are first
-# compressed into a 0-1000 integer range
-# and then adjusted to divide into following "priorities ranges":
-# (15000; 17000) : overlays (icons, captions...)
+# Priority values defined in *.prio.txt files are adjusted
+# to fit into the following "priorities ranges":
+# [-10000; 10000): overlays (icons, captions...)
 # [0; 1000)      : FG - foreground areas and lines
 # [-1000; 0)     : BG-top - water, linear and areal, rendered just on top of landcover
 # (-2000; -1000) : BG-by-size - landcover areas, later in core sorted by their bbox size
@@ -39,7 +38,11 @@ WIDTH_SCALE = 1.0
 # for special behavior and features' layer=* values.
 # See drape_frontend/stylist.cpp for the details of layering logic.
 
-PRIORITY_RANGE = 1000 # All z-indexes are compressed into this range.
+# Priority range for area and line drules. Should be same as drule::kLayerPriorityRange.
+LAYER_PRIORITY_RANGE = 1000
+# Should be same as drule::kOverlaysMaxPriority. The overlays range is [-kOverlaysMaxPriority; kOverlaysMaxPriority),
+# negative values are used for optional captions which are below all other overlays.
+OVERLAYS_MAX_PRIORITY = 10000
 
 # Drules are arranged into following ranges.
 PRIO_OVERLAYS = 'overlays'
@@ -59,7 +62,18 @@ visibilities = {}
 prio_ranges[PRIO_OVERLAYS]['comment'] = '''
 Overlays (icons, captions, path texts and shields) are rendered on top of all the geometry (lines, areas).
 Overlays don't overlap each other, instead the ones with higher priority displace the less important ones.
+Optional captions (which have an icon) are displayed only if there are no other overlays in their way
+(technically their priorities are automatically put below all other overlays in the same order as corresponding icons).
+House numbers are hardcoded to have the lowest priority.
 '''
+
+prio_ranges[PRIO_OVERLAYS]['comment'] = f'''
+Overlays (icons, captions, path texts and shields) are rendered on top of all the geometry (lines, areas).
+Overlays don't overlap each other, instead the ones with higher priority displace the less important ones.
+Optional captions (which have an icon) are displayed only if there are no other overlays in their way
+(technically, max overlays priority value ({OVERLAYS_MAX_PRIORITY}) is subtracted from their priorities automatically).
+'''
+
 prio_ranges[PRIO_FG]['comment'] = '''
 FG geometry: foreground lines and areas (e.g. buildings) are rendered always below overlays
 and always on top of background geometry (BG-top & BG-by-size) even if a foreground feature
@@ -93,8 +107,6 @@ Priorities ranges' rendering order overview:
 - BG-top: water (linear and areal)
 - BG-by-size: landcover areas sorted by their size
 '''
-
-OVERLAYS_MAX_PRIORITY = 10000
 
 def to_boolean(s):
     s = s.lower()
@@ -189,7 +201,7 @@ def load_priorities(prio_range, path, classif, compress = False):
     def print_warning(msg):
         print(f'WARNING: {msg} in {fname}:\n\t{line}')
 
-    priority_max = OVERLAYS_MAX_PRIORITY if prio_range == PRIO_OVERLAYS else PRIORITY_RANGE
+    priority_max = OVERLAYS_MAX_PRIORITY if prio_range == PRIO_OVERLAYS else LAYER_PRIORITY_RANGE
     fname = get_priorities_filename(prio_range, path)
     with open(fname, 'r') as f:
         group = []
@@ -500,7 +512,7 @@ def komap_mapswithme(options):
     # Parse style mapcss
     global style
     style = MapCSS(options.minzoom, options.maxzoom)
-    style.parse(clamp=False, stretch=PRIORITY_RANGE,
+    style.parse(clamp=False, stretch=LAYER_PRIORITY_RANGE,
                 filename=options.filename, static_tags=mapcss_static_tags,
                 dynamic_tags=mapcss_dynamic_tags)
 
