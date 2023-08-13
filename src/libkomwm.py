@@ -202,6 +202,7 @@ def load_priorities(prio_range, path, classif, compress = False):
         print(f'WARNING: {msg} in {fname}:\n\t{line}')
 
     priority_max = OVERLAYS_MAX_PRIORITY if prio_range == PRIO_OVERLAYS else LAYER_PRIORITY_RANGE
+    priority_min = -OVERLAYS_MAX_PRIORITY if prio_range == PRIO_OVERLAYS else 0
     fname = get_priorities_filename(prio_range, path)
     with open(fname, 'r') as f:
         group = []
@@ -221,14 +222,14 @@ def load_priorities(prio_range, path, classif, compress = False):
                 except ValueError:
                     print_warning('skipping invalid priority value')
                 else:
-                    if priority >= 0 and priority < priority_max:
+                    if priority >= priority_min and priority < priority_max:
                         if len(group):
                             for key in group:
                                 prio_ranges[prio_range]['priorities'][key] = priority
                         else:
                             print_warning('skipping empty priority group')
                     else:
-                        print_warning(f'skipping out of [0;{priority_max}) range priority value')
+                        print_warning(f'skipping out of [{priority_min};{priority_max}) range priority value')
                 group = []
             else:
                 cl = tokens[0]
@@ -379,7 +380,8 @@ def dump_priorities(prio_range, path, maxzoom):
                 if object_id:
                     cl += object_id
                 if not line_drules:
-                    print(f'WARNING: priority is defined, but no drules for {cl}')
+                    line_drules = "WARNING: no style defined (the type will be not included into map data)"
+                    print(f'{line_drules} for {cl}')
 
                 info = ''
                 if line_drules or other_drules:
@@ -403,7 +405,7 @@ def get_drape_priority(cl, dr_type, object_id):
         if prio_id in prio_ranges[r]['priorities']:
             return prio_ranges[r]['priorities'][prio_id] + prio_ranges[r]['base']
 
-    print(f'WARNING: priority is not set for {prio_id}')
+    print(f'WARNING: priority is not set for {dr_type} {cl}{object_id}')
     return 0
 
 def komap_mapswithme(options):
@@ -787,7 +789,7 @@ def komap_mapswithme(options):
                             dr_text.priority = get_drape_priority(cl, 'icon', st.get('object-id'))
                             # Optional captions (with icons) are automatically placed below all other overlays.
                             if dr_text.primary.is_optional:
-                                dr_text.priority -= OVERLAYS_MAX_PRIORITY
+                                dr_text.priority = max(dr_text.priority - OVERLAYS_MAX_PRIORITY, -OVERLAYS_MAX_PRIORITY)
                         else:
                             dr_text.priority = get_drape_priority(cl, text_priority_key, st.get('object-id'))
 
