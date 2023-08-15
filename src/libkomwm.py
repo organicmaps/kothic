@@ -97,7 +97,8 @@ Keep them in a logical importance order please.
 '''
 
 COMMENT_AUTOFORMAT = '''This file is automatically re-formatted and re-sorted in priorities descending order
-when generate_drules.sh is run. Custom formatting and comments are not preserved.
+when generate_drules.sh is run. All comments (drule types visibilities, etc.) are generated automatically
+for information only. Custom formatting and comments are not preserved.
 '''
 
 COMMENT_RANGES_OVERVIEW = '''
@@ -262,6 +263,7 @@ def load_priorities(prio_range, path, classif, compress = False):
                     print(f'WARNING: {key} priority is higher than {main_prio_id}, making it equal')
                     prio_ranges[PRIO_OVERLAYS]['priorities'][key] = main_prio
 
+    # TODO: update compression logic to handle icons put inbetween automatic optional captions priorities.
     if compress:
         print(f'Compressing {prio_range} priorities into a (0;{priority_max}) range:')
         unique_prios = set(prio_ranges[prio_range]['priorities'].values())
@@ -294,15 +296,15 @@ def store_visibility(cl, dr_type, object_id, zoom):
 
 def prettify_zooms(zooms, maxzoom):
 
-    def add_zrange(first, prev, result, maxzoom):
+    def add_zrange(first, last, result, maxzoom):
         first = str(first)
-        prev = str(prev)
-        if first == prev:
-            zrange = first
-        elif prev == str(maxzoom):
+        last = str(last)
+        if last == str(maxzoom):
             zrange = first + '-'
+        elif first == last:
+            zrange = first
         else:
-            zrange = first + '-' + prev
+            zrange = first + '-' + last
         if result != '':
             result += ','
         result += zrange
@@ -345,6 +347,9 @@ def dump_priorities(prio_range, path, maxzoom):
         outfile.write('\n')
 
         if len(prio_ranges[prio_range]['priorities']):
+            dr_types_order = (('icon', 'caption', 'pathtext', 'shield', 'line', 'area') if prio_range == PRIO_OVERLAYS
+                              else ('line', 'area', 'icon', 'caption', 'pathtext', 'shield'))
+
             prios = sorted(prio_ranges[prio_range]['priorities'].items(),
                            key = lambda item: (OVERLAYS_MAX_PRIORITY - item[1], item[0][0], item[0][1]))
             group_prio = prios[0][1]
@@ -360,7 +365,7 @@ def dump_priorities(prio_range, path, maxzoom):
                 line_drules = ''
                 other_drules = ''
                 if cl in visibilities:
-                    for dr_type in sorted(visibilities[cl].keys()):
+                    for dr_type in sorted(visibilities[cl].keys(), key = lambda drt: dr_types_order.index(drt)):
                         for oid in sorted(visibilities[cl][dr_type].keys()):
                             dr_zoom = dr_type + oid if oid else dr_type
                             dr_zoom += ' ' + prettify_zooms(visibilities[cl][dr_type][oid], maxzoom)
@@ -380,6 +385,7 @@ def dump_priorities(prio_range, path, maxzoom):
                 if object_id:
                     cl += object_id
                 if not line_drules:
+                    # TODO: produce similar warnings for all types in mapcss-mapping.csv but without a style.
                     line_drules = "WARNING: no style defined (the type will be not included into map data)"
                     print(f'{line_drules} for {cl}')
 
