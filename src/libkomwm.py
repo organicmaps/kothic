@@ -41,7 +41,7 @@ WIDTH_SCALE = 1.0
 # Priority range for area and line drules. Should be same as drule::kLayerPriorityRange.
 LAYER_PRIORITY_RANGE = 1000
 # Should be same as drule::kOverlaysMaxPriority. The overlays range is [-kOverlaysMaxPriority; kOverlaysMaxPriority),
-# negative values are used for optional captions which are below all other overlays.
+# negative values are used for optional captions which are below most other overlays.
 OVERLAYS_MAX_PRIORITY = 10000
 
 # Drules are arranged into following ranges.
@@ -59,18 +59,10 @@ prio_ranges = {
 
 visibilities = {}
 
-prio_ranges[PRIO_OVERLAYS]['comment'] = '''
-Overlays (icons, captions, path texts and shields) are rendered on top of all the geometry (lines, areas).
-Overlays don't overlap each other, instead the ones with higher priority displace the less important ones.
-Optional captions (which have an icon) are displayed only if there are no other overlays in their way
-(technically their priorities are automatically put below all other overlays in the same order as corresponding icons).
-House numbers are hardcoded to have the lowest priority.
-'''
-
 prio_ranges[PRIO_OVERLAYS]['comment'] = f'''
 Overlays (icons, captions, path texts and shields) are rendered on top of all the geometry (lines, areas).
 Overlays don't overlap each other, instead the ones with higher priority displace the less important ones.
-Optional captions (which have an icon) are displayed only if there are no other overlays in their way
+Optional captions (which have an icon) are usually displayed only if there are no other overlays in their way
 (technically, max overlays priority value ({OVERLAYS_MAX_PRIORITY}) is subtracted from their priorities automatically).
 '''
 
@@ -97,8 +89,8 @@ Keep them in a logical importance order please.
 '''
 
 COMMENT_AUTOFORMAT = '''This file is automatically re-formatted and re-sorted in priorities descending order
-when generate_drules.sh is run. All comments (drule types visibilities, etc.) are generated automatically
-for information only. Custom formatting and comments are not preserved.
+when generate_drules.sh is run. All comments (automatic priorities of e.g. optional captions, drule types visibilities, etc.)
+are generated automatically for information only. Custom formatting and comments are not preserved.
 '''
 
 COMMENT_RANGES_OVERVIEW = '''
@@ -282,16 +274,17 @@ def load_priorities(prio_range, path, classif, compress = False):
             prio_ranges[prio_range]['priorities'][prio_id] = int(step * (base_idx + idx))
 
 
-def store_visibility(cl, dr_type, object_id, zoom):
+def store_visibility(cl, dr_type, object_id, zoom, auto_comment = None):
     if object_id == '::default':
         object_id = ''
+    dr_type_comment = (dr_type, auto_comment)
     if cl not in visibilities:
         visibilities[cl] = {}
-    if dr_type not in visibilities[cl]:
-        visibilities[cl][dr_type] = {}
-    if object_id not in visibilities[cl][dr_type]:
-        visibilities[cl][dr_type][object_id] = set()
-    visibilities[cl][dr_type][object_id].add(zoom)
+    if dr_type_comment not in visibilities[cl]:
+        visibilities[cl][dr_type_comment] = {}
+    if object_id not in visibilities[cl][dr_type_comment]:
+        visibilities[cl][dr_type_comment][object_id] = set()
+    visibilities[cl][dr_type_comment][object_id].add(zoom)
 
 
 def prettify_zooms(zooms, maxzoom):
@@ -343,40 +336,65 @@ def dump_priorities(prio_range, path, maxzoom):
     with open(get_priorities_filename(prio_range, path), 'w') as outfile:
         comment = COMMENT_AUTOFORMAT + prio_ranges[prio_range]['comment'] + COMMENT_RANGES_OVERVIEW
         for s in comment.splitlines():
-            outfile.write(f'# {s}'.strip() + '\n')
+            outfile.write(f'# {s}'.rstrip() + '\n')
         outfile.write('\n')
 
         if len(prio_ranges[prio_range]['priorities']):
             dr_types_order = (('icon', 'caption', 'pathtext', 'shield', 'line', 'area') if prio_range == PRIO_OVERLAYS
                               else ('line', 'area', 'icon', 'caption', 'pathtext', 'shield'))
+            comment_auto_captions = '''
+                All automatic optional captions priorities are below 0.
+                They follow the order of their correspoding icons.
+                '''
 
             prios = sorted(prio_ranges[prio_range]['priorities'].items(),
                            key = lambda item: (OVERLAYS_MAX_PRIORITY - item[1], item[0][0], item[0][1]))
             group_prio = prios[0][1]
             group = ''
+            group_comment = '# '
             for p in prios:
                 if p[1] != group_prio:
-                    outfile.write(f'{group}=== {group_prio}\n\n')
+                    if prio_range == PRIO_OVERLAYS and comment_auto_captions and group_prio < 0:
+                        for s in comment_auto_captions.splitlines():
+                            outfile.write(f'# {s.strip()}'.rstrip() + '\n')
+                        outfile.write('\n')
+                        comment_auto_captions = None
+                    outfile.write(f'{group}{group_comment}=== {group_prio}\n\n')
                     group_prio = p[1]
                     group = ''
+                    group_comment = '# '
+
                 cl = p[0][0]
                 object_id = p[0][1]
+                auto_dr_type = None
+                auto_comment = None
+                if len(p[0]) == 4:
+                    auto_dr_type = p[0][2]
+                    auto_comment = p[0][3]
 
                 line_drules = ''
                 other_drules = ''
                 if cl in visibilities:
-                    for dr_type in sorted(visibilities[cl].keys(), key = lambda drt: dr_types_order.index(drt)):
-                        for oid in sorted(visibilities[cl][dr_type].keys()):
-                            dr_zoom = dr_type + oid if oid else dr_type
-                            dr_zoom += ' ' + prettify_zooms(visibilities[cl][dr_type][oid], maxzoom)
-                            # Drules matching this prio_range and object_id.
-                            if (oid == object_id and
-                                ((prio_range == PRIO_OVERLAYS and dr_type in ('icon', 'caption', 'shield', 'pathtext')) or
-                                 (prio_range in (PRIO_FG, PRIO_BG_TOP) and dr_type in ('line', 'area')) or
-                                 (prio_range == PRIO_BG_BY_SIZE and dr_type == 'area'))):
-                                    if line_drules:
-                                        line_drules += ' and '
-                                    line_drules += dr_zoom
+                    for dr_type_comment in sorted(visibilities[cl].keys(), key = lambda drt: dr_types_order.index(drt[0])):
+                        for oid in sorted(visibilities[cl][dr_type_comment].keys()):
+                            dr_type, dr_auto_comment = dr_type_comment
+                            dr_zoom = dr_type + oid
+                            if dr_auto_comment is not None:
+                                dr_zoom = f'{dr_zoom}({dr_auto_comment})'
+                            dr_zoom += ' ' + prettify_zooms(visibilities[cl][dr_type_comment][oid], maxzoom)
+                            # Drules matching this prio_range and object_id and
+                            # - an auto priority dr_type match or
+                            # - any other non-auto dr_type suitable
+                            is_auto_dr_match = dr_type == auto_dr_type and dr_auto_comment == auto_comment
+                            is_not_auto_dr = auto_dr_type is None and dr_auto_comment is None
+                            is_suitable_for_range = (
+                                (prio_range == PRIO_OVERLAYS and dr_type in ('icon', 'caption', 'pathtext', 'shield')) or
+                                (prio_range in (PRIO_FG, PRIO_BG_TOP) and dr_type in ('line', 'area')) or
+                                (prio_range == PRIO_BG_BY_SIZE and dr_type == 'area'))
+                            if oid == object_id and (is_auto_dr_match or is_not_auto_dr and is_suitable_for_range):
+                                if line_drules:
+                                    line_drules += ' and '
+                                line_drules += dr_zoom
                             else:
                                 # Drules from other prio_ranges or with other object_ids.
                                 if other_drules:
@@ -385,19 +403,24 @@ def dump_priorities(prio_range, path, maxzoom):
                 if object_id:
                     cl += object_id
                 if not line_drules:
-                    # TODO: produce similar warnings for all types in mapcss-mapping.csv but without a style.
-                    line_drules = "WARNING: no style defined (the type will be not included into map data)"
-                    print(f'{line_drules} for {cl}')
-
-                info = ''
-                if line_drules or other_drules:
-                    info = f' # {line_drules}'
                     if other_drules:
-                        info += f' (also has {other_drules})'
-                group += f'{cl:50} {info}\n'
-            outfile.write(f'{group}=== {group_prio}\n')
+                        line_drules = "WARNING: no drule defined for the priority"
+                    else:
+                        line_drules = "WARNING: no style defined (the type will be not included into map data)"
+                    print(f'{line_drules} for {cl} in {prio_range}')
 
-def get_drape_priority(cl, dr_type, object_id):
+                info = '# ' + line_drules
+                if other_drules:
+                    info += f' (also has {other_drules})'
+                if auto_dr_type is None:
+                    group_comment = ''
+                else:
+                    cl = '# ' + cl
+                group += f'{cl:50}  {info}\n'
+
+            outfile.write(f'{group}{group_comment}=== {group_prio}\n')
+
+def get_drape_priority(cl, dr_type, object_id, auto_dr_type = None, auto_comment = None, auto_prio_mod = 0):
     if object_id == '::default':
         object_id = ''
     prio_id = (cl, object_id)
@@ -409,10 +432,17 @@ def get_drape_priority(cl, dr_type, object_id):
         ranges_to_check = (PRIO_BG_BY_SIZE, PRIO_BG_TOP, PRIO_FG)
     for r in ranges_to_check:
         if prio_id in prio_ranges[r]['priorities']:
-            return prio_ranges[r]['priorities'][prio_id] + prio_ranges[r]['base']
+            priority = prio_ranges[r]['priorities'][prio_id]
+            if auto_dr_type is not None:
+                min_priority = -OVERLAYS_MAX_PRIORITY if r == PRIO_OVERLAYS else 0
+                priority = max(priority + auto_prio_mod, min_priority)
+                auto_prio_id = (cl, object_id, auto_dr_type, auto_comment)
+                prio_ranges[r]['priorities'][auto_prio_id] = priority
+            return priority + prio_ranges[r]['base']
 
     print(f'WARNING: priority is not set for {dr_type} {cl}{object_id}')
     return 0
+
 
 def komap_mapswithme(options):
     if options.data and os.path.isdir(options.data):
@@ -670,14 +700,14 @@ def komap_mapswithme(options):
 
                             dr_line.width = round((base_width + st.get('casing-width') * 2) * WIDTH_SCALE, 2)
                             dr_line.color = mwm_encode_color(colors, st, "casing")
-                            dr_line.priority = get_drape_priority(cl, 'line', st.get('object-id'))
-                            # Casing line should be rendered below the "main" line, hence priority -1 (but not less than base).
-                            if (st.get('object-id') == '::default' and dr_line.priority != 0 and
-                                dr_line.priority != prio_ranges[PRIO_FG]['base'] and
-                                dr_line.priority != prio_ranges[PRIO_BG_TOP]['base']):
-                                    store_visibility(cl, 'line', '(casing)', zoom)
-                                    dr_line.priority -= 1
+                            if st.get('object-id') == '::default':
+                                # An automatic casing line should be rendered below the "main" line, hence auto priority -1.
+                                auto_comment = 'casing'
+                                dr_line.priority = get_drape_priority(cl, 'line', st.get('object-id'), 'line', auto_comment, -1)
+                                store_visibility(cl, 'line', st.get('object-id'), zoom, auto_comment)
                             else:
+                                # A casing line explicitly defined via ::object_id.
+                                dr_line.priority = get_drape_priority(cl, 'line', st.get('object-id'))
                                 store_visibility(cl, 'line', st.get('object-id'), zoom)
                             for i in st.get('casing-dashes', st.get('dashes', [])):
                                 dr_line.dashdot.dd.extend([max(float(i), 1) * WIDTH_SCALE])
@@ -790,16 +820,23 @@ def komap_mapswithme(options):
                                 dr_cur_subtext.is_optional = True
                             dr_cur_subtext = dr_text.secondary
 
+                        auto_comment = None
                         if text_priority_key == 'caption' and dr_element.symbol.priority:
-                            # Mandatory captions with icons use icon's priority.
-                            dr_text.priority = get_drape_priority(cl, 'icon', st.get('object-id'))
-                            # Optional captions (with icons) are automatically placed below all other overlays.
+                            # A caption with an icon.
+                            # Mandatory captions use icon's priority.
+                            auto_prio_mod = 0
+                            auto_comment = 'mandatory'
                             if dr_text.primary.is_optional:
-                                dr_text.priority = max(dr_text.priority - OVERLAYS_MAX_PRIORITY, -OVERLAYS_MAX_PRIORITY)
+                                # Optional captions are automatically placed below most other overlays.
+                                auto_comment = 'optional'
+                                auto_prio_mod = -OVERLAYS_MAX_PRIORITY
+                            dr_text.priority = get_drape_priority(cl, 'icon', st.get('object-id'),
+                                                                  text_priority_key, auto_comment, auto_prio_mod)
                         else:
+                            # A pathtext or a standalone caption.
                             dr_text.priority = get_drape_priority(cl, text_priority_key, st.get('object-id'))
 
-                        store_visibility(cl, text_priority_key, st.get('object-id'), zoom)
+                        store_visibility(cl, text_priority_key, st.get('object-id'), zoom, auto_comment)
 
                         # Process captions block once.
                         has_text = None
