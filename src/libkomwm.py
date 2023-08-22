@@ -640,9 +640,9 @@ def komap_mapswithme(options):
                     st = dict([(k, v) for k, v in st.items() if str(v).strip(" 0.")])
                     if 'width' in st or 'pattern-image' in st:
                         has_lines = True
-                    if 'icon-image' in st or 'symbol-shape' in st or 'symbol-image' in st:
+                    if 'icon-image' in st and st.get('icon-image') != 'none' or 'symbol-shape' in st or 'symbol-image' in st:
                         has_icons = True
-                    if 'fill-color' in st:
+                    if 'fill-color' in st and st.get('fill-color') != 'none':
                         has_fills = True
 
                 has_text = None
@@ -760,7 +760,7 @@ def komap_mapswithme(options):
                                 dr_element.shield.min_distance = int(st.get('shield-min-distance', 0))
 
                     if has_icons:
-                        if st.get('icon-image'):
+                        if st.get('icon-image') and st.get('icon-image') != 'none':
                             icon = mwm_encode_image(st)
                             dr_element.symbol.name = icon[0]
                             dr_element.symbol.priority = get_drape_priority(cl, 'icon', st.get('object-id'))
@@ -831,7 +831,7 @@ def komap_mapswithme(options):
                         has_text = None
 
                     if has_fills:
-                        if ('fill-color' in st) and (float(st.get('fill-opacity', 1)) > 0):
+                        if 'fill-color' in st and st.get('fill-color') != 'none' and float(st.get('fill-opacity', 1)) > 0:
                             dr_element.area.color = mwm_encode_color(colors, st, "fill")
                             dr_element.area.priority = get_drape_priority(cl, 'area', st.get('object-id'))
                             store_visibility(cl, 'area', st.get('object-id'), zoom)
