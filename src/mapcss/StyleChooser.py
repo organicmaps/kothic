@@ -30,7 +30,7 @@ def make_nice_style(r):
         "checking and nicifying style table"
         if type(b) == TYPE_EVAL:
             ra[a] = b
-        elif "color" in a:
+        elif "color" in a and b.strip() != 'none':
             "parsing color value to 3-tuple"
             # print "res:", b
             if b and (type(b) != tuple):
