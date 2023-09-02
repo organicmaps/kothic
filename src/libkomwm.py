@@ -746,18 +746,18 @@ def komap_mapswithme(options):
                             store_visibility(cl, 'line', st.get('object-id'), zoom)
                             dr_element.lines.extend([dr_line])
 
-                        if st.get('shield-font-size'):
-                            dr_element.shield.height = int(st.get('shield-font-size', 10))
-                            dr_element.shield.text_color = mwm_encode_color(colors, st, "shield-text")
-                            if st.get('shield-text-halo-radius', 0) != 0:
-                                dr_element.shield.text_stroke_color = mwm_encode_color(colors, st, "shield-text-halo", "white")
-                            dr_element.shield.color = mwm_encode_color(colors, st, "shield")
-                            if st.get('shield-outline-radius', 0) != 0:
-                                dr_element.shield.stroke_color = mwm_encode_color(colors, st, "shield-outline", "white")
-                            dr_element.shield.priority = get_drape_priority(cl, 'shield', st.get('object-id'))
-                            store_visibility(cl, 'shield', st.get('object-id'), zoom)
-                            if st.get('shield-min-distance', 0) != 0:
-                                dr_element.shield.min_distance = int(st.get('shield-min-distance', 0))
+                    if st.get('shield-font-size'):
+                        dr_element.shield.height = int(st.get('shield-font-size', 10))
+                        dr_element.shield.text_color = mwm_encode_color(colors, st, "shield-text")
+                        if st.get('shield-text-halo-radius', 0) != 0:
+                            dr_element.shield.text_stroke_color = mwm_encode_color(colors, st, "shield-text-halo", "white")
+                        dr_element.shield.color = mwm_encode_color(colors, st, "shield")
+                        if st.get('shield-outline-radius', 0) != 0:
+                            dr_element.shield.stroke_color = mwm_encode_color(colors, st, "shield-outline", "white")
+                        dr_element.shield.priority = get_drape_priority(cl, 'shield', st.get('object-id'))
+                        store_visibility(cl, 'shield', st.get('object-id'), zoom)
+                        if st.get('shield-min-distance', 0) != 0:
+                            dr_element.shield.min_distance = int(st.get('shield-min-distance', 0))
 
                     if has_icons:
                         if st.get('icon-image') and st.get('icon-image') != 'none':

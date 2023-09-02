@@ -23,7 +23,7 @@ from .Condition import Condition
 
 
 NEEDED_KEYS = set(["width", "casing-width", "casing-width-add", "fill-color", "fill-image", "icon-image", "text", "extrude",
-                   "background-image", "background-color", "pattern-image", "shield-text", "symbol-shape"])
+                   "background-image", "background-color", "pattern-image", "shield-color", "symbol-shape"])
 
 WHITESPACE = re.compile(r'\s+ ', re.S | re.X)
 
