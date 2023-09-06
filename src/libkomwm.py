@@ -3,6 +3,7 @@ from optparse import OptionParser
 import os
 import csv
 import functools
+from sys import exit
 from itertools import chain
 from multiprocessing import Pool, set_start_method
 from collections import OrderedDict
@@ -89,6 +90,8 @@ Priorities ranges' rendering order overview:
 - BG-top: water (linear and areal)
 - BG-by-size: landcover areas sorted by their size
 '''
+
+validation_errors_count = 0
 
 def to_boolean(s):
     s = s.lower()
@@ -429,7 +432,9 @@ def get_drape_priority(cl, dr_type, object_id, auto_dr_type = None, auto_comment
                 prio_ranges[r]['priorities'][auto_prio_id] = priority
             return priority + prio_ranges[r]['base']
 
-    print(f'WARNING: priority is not set for {dr_type} {cl}{object_id}')
+    print(f'ERROR: priority is not set for {dr_type} {cl}{object_id}')
+    global validation_errors_count
+    validation_errors_count += 1
     return 0
 
 
@@ -849,6 +854,11 @@ def komap_mapswithme(options):
         visibility["world|" + class_tree[cl] + "|"] = "".join(visstring)
 
     validate_visibilities(options.maxzoom)
+
+    if validation_errors_count:
+        exit('FAILED to write regenerated drules files!\n'
+             f'There are {validation_errors_count} validation errors (see in the log above).\n'
+             'Fix all errors first and re-run.')
 
     output = ''
     for prio_range in prio_ranges.keys():
