@@ -310,19 +310,37 @@ def prettify_zooms(zooms, maxzoom):
 
 
 def validate_visibilities(maxzoom):
-    for cl, dr_types in visibilities.items():
-        for dr_type, object_ids in dr_types.items():
+    for cl, dr_types_comments in visibilities.items():
+        for dr_type_comment, object_ids in dr_types_comments.items():
             for object_id, zooms in object_ids.items():
                 zoom_range = prettify_zooms(zooms, maxzoom)
                 if zoom_range.find(',') != -1:
-                    print(f'WARNING: non-contiguous visibility range {zoom_range} for {cl} {dr_type}{object_id}')
+                    print(f'WARNING: non-contiguous visibility range {zoom_range} for {cl} {dr_type_comment}{object_id}')
 
-                if dr_type == 'caption' and 'icon' in dr_types and object_id in dr_types['icon']:
-                    icon_zooms = sorted(dr_types['icon'][object_id])
-                    if sorted(zooms)[0] < icon_zooms[0]:
-                        print(f'WARNING: caption {zoom_range} appears before icon {prettify_zooms(icon_zooms, maxzoom)}'
-                              f' for {cl}{object_id}')
+                dr_type = dr_type_comment[0]
+                icon_dr_type_comment = ('icon', None)
+                if (dr_type == 'caption' and icon_dr_type_comment in dr_types_comments and
+                    object_id in dr_types_comments[icon_dr_type_comment]):
+                        icon_zooms = sorted(dr_types_comments[icon_dr_type_comment][object_id])
+                        if min(zooms) < icon_zooms[0]:
+                            print(f'WARNING: caption {zoom_range} appears before icon {prettify_zooms(icon_zooms, maxzoom)}'
+                                  f' for {cl}{object_id}')
 
+                line_dr_type_comment = ('line', None)
+                if dr_type in ('pathtext', 'shield'):
+                    lines_min_zoom = maxzoom + 1
+                    if line_dr_type_comment in dr_types_comments:
+                        lines_min_zoom = maxzoom + 1
+                        for line_object_id, line_zooms in dr_types_comments[line_dr_type_comment].items():
+                            min_zoom = min(line_zooms)
+                            if min_zoom < lines_min_zoom:
+                                lines_min_zoom = min_zoom
+                    min_zoom = min(zooms)
+                    if min_zoom < lines_min_zoom:
+                        missing_zooms = prettify_zooms(range(min_zoom, lines_min_zoom), maxzoom)
+                        print(f'ERROR: {dr_type} without line at {missing_zooms} for {cl}{object_id}')
+                        global validation_errors_count
+                        validation_errors_count += 1
 
 def dump_priorities(prio_range, path, maxzoom):
     with open(get_priorities_filename(prio_range, path), 'w') as outfile:
@@ -856,6 +874,7 @@ def komap_mapswithme(options):
     validate_visibilities(options.maxzoom)
 
     if validation_errors_count:
+        print()
         exit('FAILED to write regenerated drules files!\n'
              f'There are {validation_errors_count} validation errors (see in the log above).\n'
              'Fix all errors first and re-run.')
