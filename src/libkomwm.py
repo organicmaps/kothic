@@ -703,8 +703,12 @@ def komap_mapswithme(options):
                                 # A casing line explicitly defined via ::object_id.
                                 dr_line.priority = get_drape_priority(cl, 'line', st.get('object-id'))
                                 store_visibility(cl, 'line', st.get('object-id'), zoom)
-                            for i in st.get('casing-dashes', st.get('dashes', [])):
-                                dr_line.dashdot.dd.extend([max(float(i), 1) * WIDTH_SCALE])
+                            dd = st.get('casing-dashes', st.get('dashes', []))
+                            for i in dd:
+                                if float(i) < 1:
+                                    print(f'WARNING: forcing minimum dashdot value to 1 in "{dd}" for z{zoom} line(casing) {cl}')
+                                    i = 1.0
+                                dr_line.dashdot.dd.extend([i * WIDTH_SCALE])
                             addPattern(dr_line.dashdot.dd)
                             dr_line.cap = dr_linecaps.get(st.get('casing-linecap', 'butt'), BUTTCAP)
                             dr_line.join = dr_linejoins.get(st.get('casing-linejoin', 'round'), ROUNDJOIN)
@@ -731,8 +735,12 @@ def komap_mapswithme(options):
                             dr_line = LineRuleProto()
                             dr_line.width = (st.get('width', 0) * WIDTH_SCALE)
                             dr_line.color = mwm_encode_color(colors, st)
-                            for i in st.get('dashes', []):
-                                dr_line.dashdot.dd.extend([max(float(i), 1) * WIDTH_SCALE])
+                            dd = st.get('dashes', [])
+                            for i in dd:
+                                if float(i) < 1:
+                                    print(f'WARNING: forcing minimum dashdot value to 1 in {dd} for z{zoom} line {cl}')
+                                    i = 1.0
+                                dr_line.dashdot.dd.extend([i * WIDTH_SCALE])
                             addPattern(dr_line.dashdot.dd)
                             dr_line.cap = dr_linecaps.get(st.get('linecap', 'butt'), BUTTCAP)
                             dr_line.join = dr_linejoins.get(st.get('linejoin', 'round'), ROUNDJOIN)
@@ -801,7 +809,7 @@ def komap_mapswithme(options):
                                 dr_cur_subtext.offset_y = int(sp.get('text-offset-y', sp.get('text-offset', 0)))
                             if 'text-offset-x' in sp:
                                 dr_cur_subtext.offset_x = int(sp.get('text-offset-x', 0))
-                            if 'text' in sp and sp.get('text') != 'name':
+                            if 'text' in sp and sp.get('text') not in ('name', 'int_name'):
                                 dr_cur_subtext.text = sp.get('text')
                             if 'text-optional' in sp:
                                 is_valid, value = to_boolean(sp.get('text-optional', ''))
