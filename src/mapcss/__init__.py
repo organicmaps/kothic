@@ -32,8 +32,8 @@ CLASS = re.compile(r'([\.:]:?[*\w]+) \s* ', re.S | re.X)
 #NOT_CLASS = re.compile(r'!([\.:]\w+) \s* ', re.S | re.X)
 ZOOM = re.compile(r'\| \s* z([\d\-]+) \s* ', re.I | re.S | re.X)
 GROUP = re.compile(r', \s* ', re.I | re.S | re.X)
-CONDITION = re.compile(r'\[(.+?)\] \s* ', re.S | re.X)
-OBJECT = re.compile(r'(\*|[\w]+) \s* ', re.S | re.X)
+CONDITION = re.compile(r'\[(.+?)\] (\s*) ', re.S | re.X)
+OBJECT = re.compile(r'(\*|[\w]+) (\s*) ', re.S | re.X)
 DECLARATION = re.compile(r'\{(.*?)\} \s* ', re.S | re.X)
 IMPORT = re.compile(r'@import\("(.+?)"\); \s* ', re.S | re.X)
 VARIABLE_SET = re.compile(r'@([a-z][\w\d]*) \s* : \s* (.+?) \s* ; \s* ', re.S | re.X | re.I)
@@ -211,7 +211,7 @@ class MapCSS():
             raise Exception("Variable not found: " + str(format(name)))
         return self.variables[name] if name in self.variables else m.group()
 
-    def parse(self, css=None, clamp=True, stretch=1000, filename=None, static_tags={}, dynamic_tags=set()):
+    def parse(self, css=None, filename=None, static_tags={}, dynamic_tags=set(), rewrite = False, tags_to_cl = {}):
         """
         Parses MapCSS given as string
         """
@@ -226,9 +226,24 @@ class MapCSS():
         log = logging.getLogger('mapcss.parser')
         previous = oNONE  # what was the previous CSS word?
         sc = StyleChooser(self.scalepair)  # currently being assembled
+        full_condition = ''
 
-        stck = [] # filename, original, remained
+        stck = [] # filename, remained, original
         stck.append([filename, css, css])
+        if rewrite:
+            out_file = open(stck[-1][0], 'w')
+
+        def rewrite_file(s):
+            if rewrite:
+                out_file.write(s)
+
+        def convert_to_cl(tags):
+            if tags in tags_to_cl:
+                #return tags # DEBUG To focus on non-matches only.
+                return '|' + tags_to_cl[tags]
+            # There is no OM type for this combination of tags. Have to migrate manually.
+            return '|' + tags + ' /*NO-TYPE-MATCH*/'
+
         try:
             while (len(stck) > 0):
                 css = stck[-1][1].lstrip() # remained
@@ -240,28 +255,24 @@ class MapCSS():
                         if previous == oDECLARATION:
                             self.choosers.append(sc)
                             sc = StyleChooser(self.scalepair)
-                        cond = CLASS.match(css).groups()[0]
+                        if full_condition and previous == oCONDITION:
+                            rewrite_file(convert_to_cl(full_condition))
+                            full_condition = ''
+                        m = CLASS.match(css)
+                        rewrite_file(m.group(0))
+                        cond = m.group(1)
                         log.debug("class found: %s" % (cond))
                         css = CLASS.sub("", css, 1)
                         sc.addCondition(Condition('eq', ("::class", cond)))
                         previous = oCONDITION
 
-                    ## Not class - !.motorway, !.builtup, !:hover
-                    #elif NOT_CLASS.match(css):
-                        #if (previous == oDECLARATION):
-                            #self.choosers.append(sc)
-                            #sc = StyleChooser(self.scalepair)
-                        #cond = NOT_CLASS.match(css).groups()[0]
-                        #log.debug("not_class found: %s" % (cond))
-                        #css = NOT_CLASS.sub("", css, 1)
-                        #sc.addCondition(Condition('ne', ("::class", cond)))
-                        #previous = oCONDITION
-
                     # Zoom
                     elif ZOOM.match(css):
                         if (previous != oOBJECT & previous != oCONDITION):
                             sc.newObject()
-                        cond = ZOOM.match(css).groups()[0]
+                        m = ZOOM.match(css)
+                        rewrite_file(m.group(0))
+                        cond = m.group(1)
                         log.debug("zoom found: %s" % (cond))
                         css = ZOOM.sub("", css, 1)
                         sc.addZoom(self.parseZoom(cond))
@@ -269,6 +280,10 @@ class MapCSS():
 
                     # Grouping - just a comma
                     elif GROUP.match(css):
+                        if full_condition and previous == oCONDITION:
+                            rewrite_file(convert_to_cl(full_condition))
+                            full_condition = ''
+                        rewrite_file(GROUP.match(css).group(0))
                         css = GROUP.sub("", css, 1)
                         sc.newGroup()
                         had_main_tag = False
@@ -283,12 +298,18 @@ class MapCSS():
                         if (previous != oOBJECT) and (previous != oZOOM) and (previous != oCONDITION):
                             sc.newObject()
                             had_main_tag = False
-                        cond = CONDITION.match(css).groups()[0]
+                        m = CONDITION.match(css)
+                        cond = m.group(1)
                         c = parseCondition(cond)
                         tag = c.extract_tag()
                         tag_type = static_tags.get(tag, None)
                         if tag == "*" or tag_type is not None:
                             if tag_type and had_main_tag:
+                                if rewrite:
+                                    if full_condition:
+                                        rewrite_file(convert_to_cl(full_condition))
+                                        full_condition = ''
+                                    rewrite_file('[' + cond + ']' + m.group(2))
                                 if '!' in cond:
                                     condType = 'ne'
                                     cond = cond.replace('!', '')
@@ -296,10 +317,17 @@ class MapCSS():
                                     condType = 'eq'
                                 sc.addRuntimeCondition(Condition(condType, ('extra_tag', cond)))
                             else:
+                                if rewrite:
+                                    full_condition += '[' + cond + ']'
                                 sc.addCondition(c)
                                 if tag_type:
                                     had_main_tag = True
                         elif tag in dynamic_tags:
+                            if rewrite:
+                                if full_condition:
+                                    rewrite_file(convert_to_cl(full_condition))
+                                    full_condition = ''
+                                rewrite_file('[' + cond + ']' + m.group(2))
                             sc.addRuntimeCondition(c)
                         else:
                             raise Exception("Unknown tag '" + tag + "' in condition " + cond)
@@ -308,10 +336,15 @@ class MapCSS():
 
                     # Object - way, node, relation
                     elif OBJECT.match(css):
+                        if full_condition and previous == oCONDITION:
+                            rewrite_file(convert_to_cl(full_condition) + ',\n')
+                            full_condition = ''
                         if (previous == oDECLARATION):
                             self.choosers.append(sc)
                             sc = StyleChooser(self.scalepair)
-                        obj = OBJECT.match(css).groups()[0]
+                        m = OBJECT.match(css)
+                        obj = m.group(1)
+                        rewrite_file(obj + m.group(2))
                         log.debug("object found: %s" % (obj))
                         css = OBJECT.sub("", css, 1)
                         sc.newObject(obj)
@@ -320,9 +353,16 @@ class MapCSS():
 
                     # Declaration - {...}
                     elif DECLARATION.match(css):
+                        #previous = oGROUP
+                        if full_condition and previous == oCONDITION:
+                            rewrite_file(convert_to_cl(full_condition) + '\n')
+                            #rewrite_file(convert_to_cl(full_condition) + ',\n')
+                            full_condition = ''
                         if previous == oDECLARATION or previous == oNONE:
                             raise Exception("Declaration without conditions")
-                        decl = DECLARATION.match(css).groups()[0]
+                        m = DECLARATION.match(css)
+                        rewrite_file(m.group(0))
+                        decl = m.group(1)
                         log.debug("declaration found: %s" % (decl))
                         sc.addStyles(self.subst_variables(parseDeclaration(decl)))
                         css = DECLARATION.sub("", css, 1)
@@ -331,17 +371,23 @@ class MapCSS():
                     # CSS comment
                     elif COMMENT.match(css):
                         log.debug("comment found")
+                        rewrite_file(COMMENT.match(css).group(0))
                         css = COMMENT.sub("", css, 1)
 
                     # @import("filename.css");
                     elif IMPORT.match(css):
+                        m = IMPORT.match(css)
+                        rewrite_file(m.group(0))
                         log.debug("import found")
-                        import_filename = os.path.join(basepath, IMPORT.match(css).groups()[0])
+                        import_filename = os.path.join(basepath, m.group(1))
                         try:
                             css = IMPORT.sub("", css, 1)
                             import_text = open(import_filename, "r").read()
                             stck[-1][1] = css # store remained part
                             stck.append([import_filename, import_text, import_text])
+                            if rewrite:
+                                out_file.close()
+                                out_file = open(stck[-1][0], 'w')
                             wasBroken = True
                             break
                         except IOError as e:
@@ -349,9 +395,11 @@ class MapCSS():
 
                     # Variables
                     elif VARIABLE_SET.match(css):
-                        name = VARIABLE_SET.match(css).groups()[0]
+                        m = VARIABLE_SET.match(css)
+                        rewrite_file(m.group(0))
+                        name = m.group(1)
                         log.debug("variable set found: %s" % name)
-                        self.variables[name] = VARIABLE_SET.match(css).groups()[1]
+                        self.variables[name] = m.group(2)
                         css = VARIABLE_SET.sub("", css, 1)
                         previous = oVARIABLE_SET
 
@@ -367,10 +415,17 @@ class MapCSS():
 
                 if not wasBroken:
                     stck.pop()
+                    if rewrite:
+                        out_file.close()
+                        if (len(stck) > 0):
+                            out_file = open(stck[-1][0], 'a')
 
             if (previous == oDECLARATION):
                 self.choosers.append(sc)
                 sc = StyleChooser(self.scalepair)
+
+            if rewrite:
+                out_file.close()
 
         except Exception as e:
             filename = stck[-1][0] # filename
@@ -379,26 +434,6 @@ class MapCSS():
             line = css_orig[:-len(css)].count("\n") + 1
             msg = str(e) + "\nFile: " + filename + "\nLine: " + str(line)
             raise Exception(msg)
-
-        try:
-            if clamp:
-                "clamp z-indexes, so they're tightly following integers"
-                zindex = set()
-                for chooser in self.choosers:
-                    for stylez in chooser.styles:
-                        zindex.add(float(stylez.get('z-index', 0)))
-                zindex = list(zindex)
-                zindex.sort()
-                for chooser in self.choosers:
-                    for stylez in chooser.styles:
-                        if 'z-index' in stylez:
-                            res = zindex.index(float(stylez.get('z-index', 0)))
-                            if stretch:
-                                stylez['z-index'] = stretch * res / len(zindex)
-                            else:
-                                stylez['z-index'] = res
-        except TypeError:
-            pass
 
         for chooser in self.choosers:
             for t in chooser.compatible_types:
