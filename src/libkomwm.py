@@ -969,7 +969,7 @@ def main():
                       help="read MapCSS stylesheet from FILE", metavar="FILE")
     parser.add_option("-f", "--minzoom", dest="minzoom", default=0, type="int",
                       help="minimal available zoom level", metavar="ZOOM")
-    parser.add_option("-t", "--maxzoom", dest="maxzoom", default=19, type="int",
+    parser.add_option("-t", "--maxzoom", dest="maxzoom", default=20, type="int",
                       help="maximal available zoom level", metavar="ZOOM")
     parser.add_option("-o", "--output-file", dest="outfile", default="-",
                       help="output filename", metavar="FILE")
