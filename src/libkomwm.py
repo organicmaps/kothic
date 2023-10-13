@@ -618,6 +618,7 @@ def komap_mapswithme(options):
 
     all_draw_elements = set()
 
+    global validation_errors_count
     for results in imapfunc(query_style, ((cl, classificator[cl], options.minzoom, options.maxzoom) for cl in class_order)):
         for result in results:
                 cl, zoom, runtime_conditions, zstyle = result
@@ -820,13 +821,19 @@ def komap_mapswithme(options):
                         dr_cur_subtext = dr_text.primary
                         for sp in has_text:
                             dr_cur_subtext.height = int(float(sp.get('font-size', "10").split(",")[0]))
+                            if 'text-color' not in st:
+                                print(f'ERROR: text-color not set for z{zoom} {cl}')
+                                validation_errors_count += 1
                             dr_cur_subtext.color = mwm_encode_color(colors, sp, "text")
                             if st.get('text-halo-radius', 0) != 0:
                                 dr_cur_subtext.stroke_color = mwm_encode_color(colors, sp, "text-halo", "white")
                             if 'text-offset' in sp or 'text-offset-y' in sp:
                                 dr_cur_subtext.offset_y = int(sp.get('text-offset-y', sp.get('text-offset', 0)))
-                            if 'text-offset-x' in sp:
+                            elif 'text-offset-x' in sp:
                                 dr_cur_subtext.offset_x = int(sp.get('text-offset-x', 0))
+                            elif st.get('text-position', 'center') == 'center' and dr_element.symbol.priority:
+                                print(f'ERROR: an icon is present, but caption\'s text-offset is not set for z{zoom} {cl}')
+                                validation_errors_count += 1
                             if 'text' in sp and sp.get('text') not in ('name', 'int_name'):
                                 dr_cur_subtext.text = sp.get('text')
                             if 'text-optional' in sp:
