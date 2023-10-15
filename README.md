@@ -7,3 +7,5 @@ Python dependencies:
 ```bash
 pip3 install -r requirements.txt
 ```
+
+Updating protobuf in the repo should be synced with Kothic.

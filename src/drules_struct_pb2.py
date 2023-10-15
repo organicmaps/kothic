@@ -19,9 +19,8 @@ _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'drules_struct_pb2', _globals)
 if _descriptor._USE_C_DESCRIPTORS == False:
-
-  DESCRIPTOR._options = None
-  DESCRIPTOR._serialized_options = b'H\003'
+  _globals['DESCRIPTOR']._options = None
+  _globals['DESCRIPTOR']._serialized_options = b'H\003'
   _globals['_LINEJOIN']._serialized_start=1851
   _globals['_LINEJOIN']._serialized_end=1903
   _globals['_LINECAP']._serialized_start=1905
