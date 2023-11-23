@@ -16,8 +16,6 @@ whatever_to_cairo = mapcss.webcolors.webcolors.whatever_to_cairo
 PROFILE = False
 MULTIPROCESSING = True
 
-WIDTH_SCALE = 1.0
-
 # Priority values defined in *.prio.txt files are adjusted
 # to fit into the following "priorities ranges":
 # [-10000; 10000): overlays (icons, captions...)
@@ -711,7 +709,7 @@ def komap_mapswithme(options):
                                     st['casing-width'] = base_width + st.get('casing-width-add')
                                     base_width = 0
 
-                            dr_line.width = round((base_width + st.get('casing-width') * 2) * WIDTH_SCALE, 2)
+                            dr_line.width = round(base_width + st.get('casing-width') * 2, 2)
                             dr_line.color = mwm_encode_color(colors, st, "casing")
                             if st.get('object-id') == '::default':
                                 # An automatic casing line should be rendered below the "main" line, hence auto priority -1.
@@ -722,12 +720,8 @@ def komap_mapswithme(options):
                                 # A casing line explicitly defined via ::object_id.
                                 dr_line.priority = get_drape_priority(cl, 'line', st.get('object-id'))
                                 store_visibility(cl, 'line', st.get('object-id'), zoom)
-                            dd = st.get('casing-dashes', st.get('dashes', []))
-                            for i in dd:
-                                if float(i) < 1:
-                                    print(f'WARNING: forcing minimum dashdot value to 1 in "{dd}" for z{zoom} line(casing) {cl}')
-                                    i = 1.0
-                                dr_line.dashdot.dd.extend([i * WIDTH_SCALE])
+                            for i in st.get('casing-dashes', st.get('dashes', [])):
+                                dr_line.dashdot.dd.extend([float(i)])
                             addPattern(dr_line.dashdot.dd)
                             dr_line.cap = dr_linecaps.get(st.get('casing-linecap', 'butt'), BUTTCAP)
                             dr_line.join = dr_linejoins.get(st.get('casing-linejoin', 'round'), ROUNDJOIN)
@@ -735,12 +729,12 @@ def komap_mapswithme(options):
 
                         if has_fills and is_area_st and float(st.get('fill-opacity', 1)) > 0:
                             dr_element.area.border.color = mwm_encode_color(colors, st, "casing")
-                            dr_element.area.border.width = st.get('casing-width', 0) * WIDTH_SCALE
+                            dr_element.area.border.width = st.get('casing-width', 0)
 
                         # Let's try without this additional line style overhead. Needed only for casing in road endings.
                         # if st.get('casing-linecap', st.get('linecap', 'round')) != 'butt':
                         #     dr_line = LineRuleProto()
-                        #     dr_line.width = (st.get('width', 0) * WIDTH_SCALE) + (st.get('casing-width') * WIDTH_SCALE * 2)
+                        #     dr_line.width = st.get('width', 0) + (st.get('casing-width') * 2)
                         #     dr_line.color = mwm_encode_color(colors, st, "casing")
                         #     dr_line.priority = -15000
                         #     dashes = st.get('casing-dashes', st.get('dashes', []))
@@ -752,14 +746,10 @@ def komap_mapswithme(options):
                     if has_lines:
                         if st.get('width'):
                             dr_line = LineRuleProto()
-                            dr_line.width = (st.get('width', 0) * WIDTH_SCALE)
+                            dr_line.width = st.get('width', 0)
                             dr_line.color = mwm_encode_color(colors, st)
-                            dd = st.get('dashes', [])
-                            for i in dd:
-                                if float(i) < 1:
-                                    print(f'WARNING: forcing minimum dashdot value to 1 in {dd} for z{zoom} line {cl}')
-                                    i = 1.0
-                                dr_line.dashdot.dd.extend([i * WIDTH_SCALE])
+                            for i in st.get('dashes', []):
+                                dr_line.dashdot.dd.extend([float(i)])
                             addPattern(dr_line.dashdot.dd)
                             dr_line.cap = dr_linecaps.get(st.get('linecap', 'butt'), BUTTCAP)
                             dr_line.join = dr_linejoins.get(st.get('linejoin', 'round'), ROUNDJOIN)
