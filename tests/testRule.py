@@ -41,6 +41,9 @@ class RuleTest(unittest.TestCase):
         self.assertTrue(tt)
         self.assertEqual(tt, "::default")
 
+        self.assertCountEqual(rule.extract_tags(), ["aeroway", "aerodrome"])
+
+        # Negative test cases
         self.assertFalse(rule.test({
             "aeroway": "aerodrome",
             "name": "JFK"
@@ -62,6 +65,9 @@ class RuleTest(unittest.TestCase):
         self.assertTrue(tt)
         self.assertEqual(tt, "::bridgeblack")
 
+        self.assertCountEqual(rule.extract_tags(), ["highway", "bridge"])
+
+        # Negative test cases
         self.assertFalse(rule.test({
             "highway": "unclassified",
             "bridge": "no",
@@ -72,6 +78,37 @@ class RuleTest(unittest.TestCase):
             "tunnel": "yes",
             "layer": "-1"
         }))
+
+    def test_tags_from_rule_with_class(self):
+        # Class condition doesn't add new tags
+        rule = Rule()
+        rule.conditions = [
+            parseCondition("highway=unclassified"),
+            parseCondition("bridge?"),
+            Condition("eq", ("::class", "::bridgeblack")),
+        ]
+
+        self.assertCountEqual(rule.extract_tags(), ["highway", "bridge"])
+
+        # Class condition doesn't add new tags
+        rule = Rule()
+        rule.conditions = [
+            parseCondition("highway=unclassified"),
+            Condition("eq", ("::class", "::*")),
+            parseCondition("bridge?"),
+        ]
+
+        self.assertCountEqual(rule.extract_tags(), ["highway", "bridge"])
+
+        # BUT having class as a first item overrides all the others
+        rule = Rule()
+        rule.conditions = [
+            Condition("eq", ("::class", "::int_name")),
+            parseCondition("highway=unclassified"),
+            parseCondition("bridge?"),
+        ]
+
+        self.assertCountEqual(rule.extract_tags(), ["*"])
 
 if __name__ == '__main__':
     unittest.main()
