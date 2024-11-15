@@ -61,6 +61,8 @@ class Eval():
                  "any": fake_compute,
                  "min": fake_compute,
                  "max": fake_compute,
+                 "cond": fake_compute,
+                 "boolean": fake_compute,
                  })
         return tags
 
