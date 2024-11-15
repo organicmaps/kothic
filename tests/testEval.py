@@ -8,6 +8,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 from mapcss.Eval import Eval
 
 class EvalTest(unittest.TestCase):
+    """ Test eval(...) feature for CSS properties.
+        NOTE: eval() is not used in Organic Maps styles. We can drop it completely.
+    """
     def test_eval_tag(self):
         a = Eval("""eval( tag("lanes") )""")
         self.assertEqual(a.compute({"lanes": "4"}), "4")
