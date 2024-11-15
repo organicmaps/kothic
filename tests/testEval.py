@@ -55,6 +55,45 @@ class EvalTest(unittest.TestCase):
         self.assertEqual(a.compute({"height": "2400MM"}, xscale=4), "9.6")
         self.assertEqual(a.compute({"height": "2800 мм"}, xscale=4), "11.2")
 
+    def test_eval_zmetric(self):
+        a = Eval("""eval( zmetric(tag("depth")) )""")
+        self.assertEqual(a.compute({"depth": "512"}), "256")
+        self.assertEqual(a.compute({"depth": "10m"}), "5")
+        self.assertEqual(a.compute({"depth": " 10m"}), "5")
+        self.assertEqual(a.compute({"depth": "500cm"}), "2.5")
+        self.assertEqual(a.compute({"depth": "500 cm"}), "2.5")
+        self.assertEqual(a.compute({"depth": "250CM"}), "1.25")
+        self.assertEqual(a.compute({"depth": "250 CM"}), "1.25")
+        self.assertEqual(a.compute({"depth": "30см"}), "0.15")
+        self.assertEqual(a.compute({"depth": " 30 см"}), "0.15")
+        self.assertEqual(a.compute({"depth": "1200 mm"}), "0.6")
+        self.assertEqual(a.compute({"depth": "2400MM"}), "1.2")
+        self.assertEqual(a.compute({"depth": "2800 мм"}), "1.4")
+
+    def test_eval_str(self):
+        a = Eval("""eval( str( num(tag("width")) - 200 ) )""")
+        self.assertEqual(a.compute({"width": "400"}), "200.0")
+
+    def test_eval_any(self):
+        a = Eval("""eval( any(tag("building"), tag("building:part"), "no") )""")
+        self.assertEqual(a.compute({"building": "apartment"}), "apartment")
+        self.assertEqual(a.compute({"building:part": "roof"}), "roof")
+        self.assertEqual(a.compute({"junction": "roundabout"}), "no")
+
+    def test_eval_min(self):
+        a = Eval("""eval( min( num(tag("building:levels")) * 3, 50) )""")
+        self.assertEqual(a.compute({"natural": "wood"}), "0")
+        self.assertEqual(a.compute({"building:levels": "0"}), "0")
+        self.assertEqual(a.compute({"building:levels": "10"}), "30")
+        self.assertEqual(a.compute({"building:levels": "30"}), "50")
+
+    def test_eval_max(self):
+        a = Eval("""eval( max( tag("speed:limit"), 60) )""")
+        self.assertEqual(a.compute({"natural": "wood"}), "60")
+        self.assertEqual(a.compute({"speed:limit": "30"}), "60")
+        self.assertEqual(a.compute({"speed:limit": "60"}), "60")
+        self.assertEqual(a.compute({"speed:limit": "90"}), "90")
+
     def test_complex_eval(self):
         a = Eval(""" eval( any( metric(tag("height")), metric ( num(tag("building:levels")) * 3), metric("1m"))) """)
         self.assertEqual(a.compute({"building:levels": "3"}), "9")
