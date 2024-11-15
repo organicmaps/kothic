@@ -8,9 +8,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 from mapcss import parseDeclaration
 
 class MapCSSTest(unittest.TestCase):
-    """ Test eval(...) feature for CSS properties.
-        NOTE: eval() is not used in Organic Maps styles. We can drop it completely.
-    """
     def test_declarations(self):
         decl = parseDeclaration(""" linejoin: round; """)
         self.assertEqual(len(decl), 1)
