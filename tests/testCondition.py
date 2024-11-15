@@ -282,5 +282,13 @@ class ConditionTest(unittest.TestCase):
         self.assertFalse(cond.test({"access": "private"}))
         self.assertFalse(cond.test({"oneway": "yes"}))
 
+    def test_parser_errors(self):
+        with self.assertRaises(Exception):
+            parseCondition("! tunnel")
+        with self.assertRaises(Exception):
+            """ Symbol '-' is only supported in simple 'set' rule. E.g. [key-with-dash]
+                But not in 'unset' rule [!key-with-dash] """
+            parseCondition("key-with-dash?")
+
 if __name__ == '__main__':
     unittest.main()
