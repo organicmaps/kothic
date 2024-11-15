@@ -34,6 +34,14 @@ class ConditionTest(unittest.TestCase):
         self.assertEqual(cond.type, "eq")
         self.assertEqual(cond.params, ("::class", "::*"))
         self.assertEqual(cond.extract_tag(), "*")
+        self.assertEqual(cond.test({'any_key': 'any_value'}), "::*")
+        self.assertTrue(cond.test({'any_key': 'any_value'}))
+
+        cond = Condition('eq', ("::class", "::int_name"))
+        self.assertEqual(cond.type, "eq")
+        self.assertEqual(cond.params, ("::class", "::int_name"))
+        self.assertEqual(cond.extract_tag(), "*")
+        self.assertEqual(cond.test({'any_key': 'any_value'}), "::int_name")
         self.assertTrue(cond.test({'any_key': 'any_value'}))
 
     def test_parser_regex(self):
