@@ -6,7 +6,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from mapcss import parseCondition, Condition
-from mapcss.StyleChooser import StyleChooser
+from mapcss.Eval import Eval
+from mapcss.StyleChooser import StyleChooser, make_nice_style
 
 
 class StyleChooserTest(unittest.TestCase):
@@ -80,6 +81,43 @@ class StyleChooserTest(unittest.TestCase):
         sc.addCondition(parseCondition("building:part"))
 
         self.assertSetEqual(sc.extract_tags(), {"waterway", "building:part", "building", "aeroway"})
+
+    def test_make_nice_style(self):
+        style = make_nice_style({
+            "outline-color": "none",
+            "bg-color": "red",
+            "dash-color": "#ffff00",
+            "front-color": "rgb(0, 255, 255)",
+            "line-width": Eval("""eval(min(tag("line_width"), 10))"""),
+            "outline-width": "2.5",
+            "arrow-opacity": "0.5",
+            "offset-2": "20",
+            "border-radius": "4",
+            "line-extrude": "16",
+            "dashes": "3,3,1.5,3",
+            "wrong-dashes": "yes, yes, yes, no",
+            "make-nice": True,
+            "additional-len": 44.5
+        })
+
+        expectedStyle = {
+            "outline-color": "none",
+            "bg-color": (1.0, 0.0, 0.0),
+            "dash-color": (1.0, 1.0, 0.0),
+            "front-color": (0.0, 1.0, 1.0),
+            "line-width": Eval("""eval(min(tag("line_width"), 10))"""),
+            "outline-width": 2.5,
+            "arrow-opacity": 0.5,
+            "offset-2": 20.0,
+            "border-radius": 4.0,
+            "line-extrude": 16.0,
+            "dashes": [3.0, 3.0, 1.5, 3.0],
+            "wrong-dashes": [],
+            "make-nice": True,
+            "additional-len": 44.5
+        }
+
+        self.assertEqual(style, expectedStyle)
 
     def test_styles(self):
         sc = StyleChooser((15, 19))

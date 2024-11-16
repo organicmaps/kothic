@@ -112,6 +112,8 @@ class Eval():
     def __repr__(self):
         return "eval(%s)" % self.expr_text
 
+    def __eq__(self, other):
+        return type(self) == type(other) and self.expr_text == other.expr_text
 
 def m_boolean(expr):
     expr = str(expr)
