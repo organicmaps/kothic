@@ -44,6 +44,7 @@ ZOOM_MIN = re.compile(r'(\d+)\-      $', re.S | re.X)
 ZOOM_MAX = re.compile(r'     \-(\d+) $', re.S | re.X)
 ZOOM_SINGLE = re.compile(r'       (\d+) $', re.S | re.X)
 
+# Todo move to Condition.py
 CONDITION_TRUE = re.compile(r'\s* ([:\w]+) \s* [?] \s*  $', re.I | re.S | re.X)
 CONDITION_invTRUE = re.compile(r'\s* [!] \s* ([:\w]+) \s* [?] \s*  $', re.I | re.S | re.X)
 CONDITION_FALSE = re.compile(r'\s* ([:\w]+) \s* = \s* no  \s*  $', re.I | re.S | re.X)
@@ -407,7 +408,7 @@ class MapCSS():
                 else:
                     self.choosers_by_type[t].append(chooser)
 
-
+# Todo move to Condition.py
 def parseCondition(s):
     log = logging.getLogger('mapcss.parser.condition')
 
@@ -488,7 +489,7 @@ def parseDeclaration(s):
             logging.debug("%s == %s" % (tzz[0], tzz[1]))
         else:
             logging.debug("unknown %s" % (a))
-    return [t]
+    return [t] # TODO: don't wrap `t` dict into a list. Return `t` instead.
 
 
 if __name__ == "__main__":

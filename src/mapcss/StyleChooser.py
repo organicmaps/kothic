@@ -76,6 +76,8 @@ class StyleChooser:
     The styles property is an array of all the style objects to be drawn
         if any of the ruleChains evaluate to true.
     """
+    # TODO: use logging for debug logs
+
     def __repr__(self):
         return "{(%s) : [%s] }\n" % (self.ruleChains, self.styles)
 
@@ -143,6 +145,7 @@ class StyleChooser:
                 for a, b in r.items():
                     "calculating eval()'s"
                     if type(b) == self.eval_type:
+                        # TODO: Move next block to a separate function
                         combined_style = {}
                         for t in sl:
                             combined_style.update(t)
@@ -159,6 +162,7 @@ class StyleChooser:
             hasall = False
             allinit = {}
             for x in sl:
+                # TODO: Introduce new constant for "::*"
                 if x.get("object-id") == "::*":
                     allinit = x.copy()
                 if ra["object-id"] == "::*":
@@ -235,6 +239,7 @@ class StyleChooser:
         """
         adds to this.styles
         """
+        # TODO: move next for-loop to a new method. Don't call it on every style append
         for r in self.ruleChains:
             if not self.selzooms:
                 self.selzooms = [r.minZoom, r.maxZoom]
