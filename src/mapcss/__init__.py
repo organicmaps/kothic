@@ -378,7 +378,9 @@ class MapCSS():
             css_orig = stck[-1][2] # original
             css = stck[-1][1] # remained
             line = css_orig[:-len(css)].count("\n") + 1
+            # TODO: Handle filename is none case
             msg = str(e) + "\nFile: " + filename + "\nLine: " + str(line)
+            # TODO: Print stack trace of original exception `e`
             raise Exception(msg)
 
         try:
