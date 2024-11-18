@@ -119,7 +119,7 @@ class StyleChooserTest(unittest.TestCase):
 
         self.assertEqual(style, expectedStyle)
 
-    def test_styles(self):
+    def test_add_styles(self):
         sc = StyleChooser((15, 19))
         sc.newObject()
         sc.addStyles([{
@@ -142,6 +142,32 @@ class StyleChooserTest(unittest.TestCase):
             "color": (1.0, 1.0, 1.0),
             "casing-width": 5.0
         })
+
+    def test_update_styles(self):
+        sc = StyleChooser((15, 19))
+        sc.newObject()
+        sc.addStyles([{
+            "width": "1.3",
+            "opacity": "0.6",
+            "bg-color": """eval( prop("primary_color") )""",
+            "text-offset": """eval( cond( boolean(tag("oneway")), 10, 5) )"""
+        }])
+
+        styles = [{"primary_color": (1.0, 1.0, 1.0)}]
+        object_tags = {"highway": "service",
+                       "oneway": "yes"}
+        new_styles = sc.updateStyles(styles, object_tags, 1.0, 1.0, False)
+        expected_new_styles = {
+            "width": 1.3,
+            "opacity": 0.6,
+            "bg-color": (1.0, 1.0, 1.0),
+            "text-offset": 10.0,
+            "object-id": "::default"
+        }
+
+        self.assertEqual(len(new_styles), 2)
+        self.assertEqual(new_styles[-1], expected_new_styles)
+
 
     def test_runtime_conditions(self):
         #sc.addRuntimeCondition(Condition(condType, ('extra_tag', cond)))
