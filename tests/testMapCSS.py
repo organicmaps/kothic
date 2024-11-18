@@ -66,7 +66,7 @@ class MapCSSTest(unittest.TestCase):
         # TODO: Prepare *.mapcss files with @include(...)
         pass
 
-    def test_parse_include(self):
+    def test_parse_basic_chooser(self):
         parser = MapCSS()
         dynamic_tags = {"tourism": True, "office": True,
                         "craft": True, "amenity": True}
@@ -84,6 +84,26 @@ area|z19-[amenity],
 
         self.assertEqual(len(parser.choosers), 1)
         self.assertEqual(len(parser.choosers[0].ruleChains), 8)
+
+    def test_parse_basic_chooser_2(self):
+        parser = MapCSS()
+        dynamic_tags = {"highway": True}
+        parser.parse("""
+@trunk0: #FF7326;
+
+line|z6[highway=trunk],
+line|z6[highway=motorway],
+{color: @trunk0; opacity: 0.3;}
+line|z7-9[highway=trunk],
+line|z7-9[highway=motorway],
+{color: @trunk0; opacity: 0.7;}
+""", dynamic_tags=dynamic_tags)
+
+        self.assertEqual(len(parser.choosers), 2)
+        self.assertEqual(len(parser.choosers[0].ruleChains), 2)
+        self.assertEqual(parser.choosers[0].ruleChains[0].subject, 'line')
+        self.assertEqual(parser.choosers[0].selzooms, [6, 6])
+        self.assertEqual(parser.choosers[1].selzooms, [7, 9])
 
 if __name__ == '__main__':
     unittest.main()
