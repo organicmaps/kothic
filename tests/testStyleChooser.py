@@ -124,14 +124,24 @@ class StyleChooserTest(unittest.TestCase):
         sc.newObject()
         sc.addStyles([{
             "width": "1.3",
-            "opacity": "0.6"
+            "opacity": "0.6",
+            "bg-color": "blue"
         }])
         sc.addStyles([{
-            "color": "#808080",
-            "width": "1.6"
+            "color": "#FFFFFF",
+            "casing-width": "+10"
         }])
 
         self.assertEqual(len(sc.styles), 2)
+        self.assertEqual(sc.styles[0], {
+            "width": 1.3,
+            "opacity": 0.6,
+            "bg-color": (0.0, 0.0, 1.0)
+        })
+        self.assertEqual(sc.styles[1], {
+            "color": (1.0, 1.0, 1.0),
+            "casing-width": 5.0
+        })
 
     def test_runtime_conditions(self):
         #sc.addRuntimeCondition(Condition(condType, ('extra_tag', cond)))
