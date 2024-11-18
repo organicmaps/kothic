@@ -124,6 +124,7 @@ class StyleChooser:
 
         return rule.runtime_conditions
 
+    # TODO: Rename to "applyStyles"
     def updateStyles(self, sl, tags, xscale, zscale, filter_by_runtime_conditions):
         # Are any of the ruleChains fulfilled?
         rule_and_object_id = self.testChains(tags)
@@ -162,7 +163,6 @@ class StyleChooser:
             hasall = False
             allinit = {}
             for x in sl:
-                # TODO: Introduce new constant for "::*"
                 if x.get("object-id") == "::*":
                     allinit = x.copy()
                 if ra["object-id"] == "::*":
