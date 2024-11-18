@@ -2,6 +2,8 @@ import unittest
 import sys
 from pathlib import Path
 
+from mapcss.Rule import Rule
+
 # Add `src` directory to the import paths
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
@@ -144,16 +146,17 @@ class StyleChooserTest(unittest.TestCase):
         })
 
     def test_update_styles(self):
+        styles = [{"primary_color": (1.0, 1.0, 1.0)}]
+
         sc = StyleChooser((15, 19))
         sc.newObject()
         sc.addStyles([{
             "width": "1.3",
             "opacity": "0.6",
-            "bg-color": """eval( prop("primary_color") )""",
-            "text-offset": """eval( cond( boolean(tag("oneway")), 10, 5) )"""
+            "bg-color": """eval( prop("primary_color") )""", # Check that property from `styles` is applied
+            "text-offset": """eval( cond( boolean(tag("oneway")), 10, 5) )""" # Check that tags are applied
         }])
 
-        styles = [{"primary_color": (1.0, 1.0, 1.0)}]
         object_tags = {"highway": "service",
                        "oneway": "yes"}
         new_styles = sc.updateStyles(styles, object_tags, 1.0, 1.0, False)
@@ -168,9 +171,126 @@ class StyleChooserTest(unittest.TestCase):
         self.assertEqual(len(new_styles), 2)
         self.assertEqual(new_styles[-1], expected_new_styles)
 
+    def test_update_styles_2(self):
+        styles = []
+
+        sc = StyleChooser((15, 19))
+
+        sc.newObject()
+        sc.addCondition(Condition("eq", ("::class", "::int_name") )) # Class should be added to the style
+        sc.addCondition(parseCondition("oneway?"))
+
+        sc.addStyles([{
+            "width": "1.3",
+            "bg-color": "black"
+        }])
+
+        object_tags = {"highway": "service", "oneway": "yes"}
+        new_styles = sc.updateStyles(styles, object_tags, 1.0, 1.0, False)
+        expected_new_styles = {
+            "width": 1.3,
+            "bg-color": (0.0, 0.0, 0.0),
+            "object-id": "::int_name" # Check that class from sc.ruleChains is added to the style
+        }
+
+        self.assertEqual(len(new_styles), 1)
+        self.assertEqual(new_styles[-1], expected_new_styles)
+
+
+    def test_update_styles_by_class(self):
+        # Predefined styles
+        styles = [{
+            "some-width": 2.5,
+            "object-id": "::flats"
+        },
+        {
+            "some-width": 3.5,
+            "object-id": "::bridgeblack"
+        },
+        {
+            "some-width": 4.5,
+            "object-id": "::default"
+        }]
+
+        sc = StyleChooser((15, 19))
+
+        sc.newObject()
+        sc.addCondition(Condition("eq", ("::class", "::flats") )) # `sc` styles should apply only to `::flats` class
+        sc.addCondition(parseCondition("oneway?"))
+
+        sc.newObject()
+        sc.addCondition(Condition("eq", ("::class", "::bridgeblack") )) # This class is ignored by StyleChooser
+        sc.addCondition(parseCondition("oneway?"))
+
+        sc.addStyles([{
+            "some-width": "1.5",
+            "other-offset": "4"
+        }])
+
+        object_tags = {"highway": "service", "oneway": "yes"}
+
+        # Apply new style to predefined styles with filter by class
+        new_styles = sc.updateStyles(styles, object_tags, 1.0, 1.0, False)
+
+        expected_new_styles = [{ # The first style changes
+            "some-width": 1.5,
+            "other-offset": 4.0,
+            "object-id": "::flats"
+        },
+        { # Style not changed (class is not `::flats`)
+            "some-width": 3.5,
+            "object-id": "::bridgeblack"
+        },
+        { # Style not changed (class is not `::flats`)
+            "some-width": 4.5,
+            "object-id": "::default"
+        }]
+
+        self.assertEqual(len(new_styles), 3)
+        self.assertEqual(new_styles, expected_new_styles)
+
+
+    def test_update_styles_by_class_all(self):
+        # Predefined styles
+        styles = [{ # This is applied to StyleChooser styles
+            "some-width": 2.5,
+            "corner-radius": 2.5,
+            "object-id": "::*"
+        },
+        {
+            "some-width": 3.5,
+            "object-id": "::bridgeblack"
+        }]
+
+        sc = StyleChooser((15, 19))
+
+        sc.newObject()
+        sc.addCondition(parseCondition("tunnel"))
+
+        sc.addStyles([{
+            "some-width": "1.5",
+            "other-offset": "4"
+        }])
+        object_tags = {"highway": "service", "tunnel": "yes"}
+
+        # Apply new style to predefined styles with filter by class
+        new_styles = sc.updateStyles(styles, object_tags, 1.0, 1.0, False)
+
+        # Check that new style with new `object-id` is added.
+        # This style is built from `styles[0]` and styles from `sc`
+        expected_new_style = {
+            "some-width": 1.5,
+            "corner-radius": 2.5,
+            "other-offset": 4.0,
+            "object-id": "::default"  # New class, never listed in `styles`
+        }
+
+        self.assertEqual(len(new_styles), 3)
+        self.assertEqual(new_styles[-1], expected_new_style)
+
 
     def test_runtime_conditions(self):
-        #sc.addRuntimeCondition(Condition(condType, ('extra_tag', cond)))
+        # TODO: Create test with  sc.addRuntimeCondition(Condition(condType, ('extra_tag', cond)))
         pass
 
 if __name__ == '__main__':
