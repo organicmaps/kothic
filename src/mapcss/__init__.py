@@ -25,6 +25,7 @@ from .Condition import Condition
 NEEDED_KEYS = set(["width", "casing-width", "casing-width-add", "fill-color", "fill-image", "icon-image", "text", "extrude",
                    "background-image", "background-color", "pattern-image", "shield-color", "symbol-shape"])
 
+# TODO: Unused constant
 WHITESPACE = re.compile(r'\s+ ', re.S | re.X)
 
 COMMENT = re.compile(r'\/\* .*? \*\/ \s* ', re.S | re.X)
@@ -40,30 +41,30 @@ VARIABLE_SET = re.compile(r'@([a-z][\w\d]*) \s* : \s* (.+?) \s* ; \s* ', re.S | 
 UNKNOWN = re.compile(r'(\S+) \s* ', re.S | re.X)
 
 ZOOM_MINMAX = re.compile(r'(\d+)\-(\d+) $', re.S | re.X)
-ZOOM_MIN = re.compile(r'(\d+)\-      $', re.S | re.X)
-ZOOM_MAX = re.compile(r'     \-(\d+) $', re.S | re.X)
+ZOOM_MIN    = re.compile(r'(\d+)\-      $', re.S | re.X)
+ZOOM_MAX    = re.compile(r'     \-(\d+) $', re.S | re.X)
 ZOOM_SINGLE = re.compile(r'       (\d+) $', re.S | re.X)
 
 # TODO: move to Condition.py
-CONDITION_TRUE = re.compile(r'\s* ([:\w]+) \s* [?] \s*  $', re.I | re.S | re.X)
+CONDITION_TRUE    = re.compile(r'\s* ([:\w]+) \s* [?] \s*  $', re.I | re.S | re.X)
 CONDITION_invTRUE = re.compile(r'\s* [!] \s* ([:\w]+) \s* [?] \s*  $', re.I | re.S | re.X)
-CONDITION_FALSE = re.compile(r'\s* ([:\w]+) \s* = \s* no  \s*  $', re.I | re.S | re.X)
-CONDITION_SET = re.compile(r'\s* ([-:\w]+) \s* $', re.S | re.X)
-CONDITION_UNSET = re.compile(r'\s* !([:\w]+) \s* $', re.S | re.X)
-CONDITION_EQ = re.compile(r'\s* ([:\w]+) \s* =  \s* (.+) \s* $', re.S | re.X)
-CONDITION_NE = re.compile(r'\s* ([:\w]+) \s* != \s* (.+) \s* $', re.S | re.X)
-CONDITION_GT = re.compile(r'\s* ([:\w]+) \s* >  \s* (.+) \s* $', re.S | re.X)
-CONDITION_GE = re.compile(r'\s* ([:\w]+) \s* >= \s* (.+) \s* $', re.S | re.X)
-CONDITION_LT = re.compile(r'\s* ([:\w]+) \s* <  \s* (.+) \s* $', re.S | re.X)
-CONDITION_LE = re.compile(r'\s* ([:\w]+) \s* <= \s* (.+) \s* $', re.S | re.X)
-CONDITION_REGEX = re.compile(r'\s* ([:\w]+) \s* =~\/ \s* (.+) \/ \s* $', re.S | re.X)
+CONDITION_FALSE   = re.compile(r'\s* ([:\w]+) \s* = \s* no  \s*  $', re.I | re.S | re.X)
+CONDITION_SET     = re.compile(r'\s* ([-:\w]+) \s* $', re.S | re.X)
+CONDITION_UNSET   = re.compile(r'\s* !([:\w]+) \s* $', re.S | re.X)
+CONDITION_EQ      = re.compile(r'\s* ([:\w]+) \s* =  \s* (.+) \s* $', re.S | re.X)
+CONDITION_NE      = re.compile(r'\s* ([:\w]+) \s* != \s* (.+) \s* $', re.S | re.X)
+CONDITION_GT      = re.compile(r'\s* ([:\w]+) \s* >  \s* (.+) \s* $', re.S | re.X)
+CONDITION_GE      = re.compile(r'\s* ([:\w]+) \s* >= \s* (.+) \s* $', re.S | re.X)
+CONDITION_LT      = re.compile(r'\s* ([:\w]+) \s* <  \s* (.+) \s* $', re.S | re.X)
+CONDITION_LE      = re.compile(r'\s* ([:\w]+) \s* <= \s* (.+) \s* $', re.S | re.X)
+CONDITION_REGEX   = re.compile(r'\s* ([:\w]+) \s* =~\/ \s* (.+) \/ \s* $', re.S | re.X)
 
 ASSIGNMENT_EVAL = re.compile(r"\s* (\S+) \s* \:      \s* eval \s* \( \s* ' (.+?) ' \s* \) \s* $", re.I | re.S | re.X)
-ASSIGNMENT = re.compile(r'\s* (\S+) \s* \:      \s*          (.+?) \s*                   $', re.S | re.X)
-SET_TAG_EVAL = re.compile(r"\s* set \s+(\S+)\s* = \s* eval \s* \( \s* ' (.+?) ' \s* \) \s* $", re.I | re.S | re.X)
-SET_TAG = re.compile(r'\s* set \s+(\S+)\s* = \s*          (.+?) \s*                   $', re.I | re.S | re.X)
-SET_TAG_TRUE = re.compile(r'\s* set \s+(\S+)\s* $', re.I | re.S | re.X)
-EXIT = re.compile(r'\s* exit \s* $', re.I | re.S | re.X)
+ASSIGNMENT      = re.compile(r'\s* (\S+) \s* \:      \s*          (.+?) \s*                   $', re.S | re.X)
+SET_TAG_EVAL    = re.compile(r"\s* set \s+(\S+)\s* = \s* eval \s* \( \s* ' (.+?) ' \s* \) \s* $", re.I | re.S | re.X)
+SET_TAG         = re.compile(r'\s* set \s+(\S+)\s* = \s*          (.+?) \s*                   $', re.I | re.S | re.X)
+SET_TAG_TRUE    = re.compile(r'\s* set \s+(\S+)\s* $', re.I | re.S | re.X)
+EXIT            = re.compile(r'\s* exit \s* $', re.I | re.S | re.X)
 
 oNONE = 0
 oZOOM = 2
@@ -389,6 +390,7 @@ class MapCSS():
         try:
             if clamp:
                 "clamp z-indexes, so they're tightly following integers"
+                # TODO: Move following block to a separate method
                 zindex = set()
                 for chooser in self.choosers:
                     for stylez in chooser.styles:
@@ -404,8 +406,10 @@ class MapCSS():
                             else:
                                 stylez['z-index'] = res
         except TypeError:
+            # TODO: Better error handling here
             pass
 
+        # Group MapCSS styles by object type: 'area', 'line', 'way', 'node'
         for chooser in self.choosers:
             for t in chooser.compatible_types:
                 if t not in self.choosers_by_type:
