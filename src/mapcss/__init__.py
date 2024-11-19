@@ -44,7 +44,7 @@ ZOOM_MIN = re.compile(r'(\d+)\-      $', re.S | re.X)
 ZOOM_MAX = re.compile(r'     \-(\d+) $', re.S | re.X)
 ZOOM_SINGLE = re.compile(r'       (\d+) $', re.S | re.X)
 
-# Todo move to Condition.py
+# TODO: move to Condition.py
 CONDITION_TRUE = re.compile(r'\s* ([:\w]+) \s* [?] \s*  $', re.I | re.S | re.X)
 CONDITION_invTRUE = re.compile(r'\s* [!] \s* ([:\w]+) \s* [?] \s*  $', re.I | re.S | re.X)
 CONDITION_FALSE = re.compile(r'\s* ([:\w]+) \s* = \s* no  \s*  $', re.I | re.S | re.X)
@@ -74,6 +74,7 @@ oDECLARATION = 6
 oSUBPART = 7
 oVARIABLE_SET = 8
 
+# TODO: Following block of variables is never used
 DASH = re.compile(r'\-/g')
 COLOR = re.compile(r'color$/')
 BOLD = re.compile(r'^bold$/i')
@@ -82,6 +83,7 @@ UNDERLINE = re.compile(r'^underline$/i')
 CAPS = re.compile(r'^uppercase$/i')
 CENTER = re.compile(r'^center$/i')
 
+# TODO: Remove unused HEX variable
 HEX = re.compile(r'^#([0-9a-f]+)$/i')
 VARIABLE = re.compile(r'@([a-z][\w\d]*)')
 
@@ -111,6 +113,7 @@ class MapCSS():
         elif ZOOM_SINGLE.match(s):
             return float(ZOOM_SINGLE.match(s).groups()[0]), float(ZOOM_SINGLE.match(s).groups()[0])
         else:
+            # TODO: Should we raise an exception here?
             logging.error("unparsed zoom: %s" % s)
 
     def build_choosers_tree(self, clname, type, cltag):
@@ -378,7 +381,7 @@ class MapCSS():
             css_orig = stck[-1][2] # original
             css = stck[-1][1] # remained
             line = css_orig[:-len(css)].count("\n") + 1
-            # TODO: Handle filename is none case
+            # TODO: Handle filename is None case
             msg = str(e) + "\nFile: " + filename + "\nLine: " + str(line)
             # TODO: Print stack trace of original exception `e`
             raise Exception(msg)
@@ -410,7 +413,7 @@ class MapCSS():
                 else:
                     self.choosers_by_type[t].append(chooser)
 
-# Todo move to Condition.py
+# TODO: move to Condition.py
 def parseCondition(s):
     log = logging.getLogger('mapcss.parser.condition')
 
