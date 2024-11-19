@@ -363,7 +363,7 @@ class MapCSS():
                     elif UNKNOWN.match(css):
                         raise Exception("Unknown construction: " + UNKNOWN.match(css).group())
 
-                    # Must be unreacheable
+                    # Must be unreachable
                     else:
                         raise Exception("Unexpected construction: " + css)
 
@@ -381,7 +381,7 @@ class MapCSS():
             css_orig = stck[-1][2] # original
             css = stck[-1][1] # remained
             line = css_orig[:-len(css)].count("\n") + 1
-            # TODO: Handle filename is None case
+            # TODO: Handle filename is None
             msg = str(e) + "\nFile: " + filename + "\nLine: " + str(line)
             # TODO: Print stack trace of original exception `e`
             raise Exception(msg)

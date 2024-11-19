@@ -14,7 +14,7 @@ class MapCSSTest(unittest.TestCase):
         self.assertEqual(len(decl), 1)
         self.assertEqual(decl[0], {"linejoin": "round"})
 
-        decl = parseDeclaration(""" linejoin: round; """)
+        decl = parseDeclaration("""\tlinejoin :\nround ; """)
         self.assertEqual(len(decl), 1)
         self.assertEqual(decl[0], {"linejoin": "round"})
 
@@ -28,12 +28,12 @@ class MapCSSTest(unittest.TestCase):
         decl = parseDeclaration("""
             pattern-offset: 90\t;
             pattern-image:\tarrow-m.svg   ;
-            pattern-spacing: 90 ;""")
+            pattern-spacing: @trunk0 ;""")
         self.assertEqual(len(decl), 1)
         self.assertEqual(decl[0], {
             "pattern-offset": "90",
             "pattern-image": "arrow-m.svg",
-            "pattern-spacing": "90",
+            "pattern-spacing": "@trunk0",
         })
 
     def test_parse_variables(self):
@@ -68,7 +68,7 @@ class MapCSSTest(unittest.TestCase):
 
     def test_parse_basic_chooser(self):
         parser = MapCSS()
-        dynamic_tags = {"tourism": True, "office": True,
+        static_tags = {"tourism": True, "office": True,
                         "craft": True, "amenity": True}
         parser.parse("""
 node|z17-[tourism],
@@ -80,14 +80,14 @@ area|z18-[craft],
 node|z19-[amenity],
 area|z19-[amenity],
 {text: name; text-color: #000030; text-offset: 1;}
-""", dynamic_tags=dynamic_tags)
+""", static_tags=static_tags)
 
         self.assertEqual(len(parser.choosers), 1)
         self.assertEqual(len(parser.choosers[0].ruleChains), 8)
 
     def test_parse_basic_chooser_2(self):
         parser = MapCSS()
-        dynamic_tags = {"highway": True}
+        static_tags = {"highway": True}
         parser.parse("""
 @trunk0: #FF7326;
 
@@ -97,13 +97,63 @@ line|z6[highway=motorway],
 line|z7-9[highway=trunk],
 line|z7-9[highway=motorway],
 {color: @trunk0; opacity: 0.7;}
-""", dynamic_tags=dynamic_tags)
+""", static_tags=static_tags)
 
         self.assertEqual(len(parser.choosers), 2)
         self.assertEqual(len(parser.choosers[0].ruleChains), 2)
         self.assertEqual(parser.choosers[0].ruleChains[0].subject, 'line')
         self.assertEqual(parser.choosers[0].selzooms, [6, 6])
         self.assertEqual(parser.choosers[1].selzooms, [7, 9])
+
+    def test_parse_basic_chooser_3(self):
+        parser = MapCSS()
+        static_tags = {"addr:housenumber": True, "addr:street": False}
+        parser.parse("""
+/* Some Comment Here */
+
+/*
+   This sample is borrowed from Organic Maps Basemap_label.mapcss file
+ */
+node|z18-[addr:housenumber][addr:street]::int_name
+{text: int_name; text-color: #65655E; text-position: center;}
+""", static_tags=static_tags)
+
+        building_tags = {"building": "yes", "addr:housenumber": "12", "addr:street": "Baker street"}
+
+        # Check that mapcss parsed correctly
+        self.assertEqual(len(parser.choosers), 1)
+        styleChooser = parser.choosers[0]
+        self.assertEqual(len(styleChooser.ruleChains), 1)
+        self.assertEqual(styleChooser.selzooms, [18, 19])
+        rule, object_id = styleChooser.testChains(building_tags)
+        self.assertEqual(object_id, "::int_name")
+
+        rule = styleChooser.ruleChains[0]
+        self.assertEqual(rule.subject, 'node')
+        self.assertEqual(rule.extract_tags(), {'addr:housenumber', 'addr:street'})
+
+    def test_parse_basic_chooser_class(self):
+        parser = MapCSS()
+        static_tags = {"addr:housenumber": True, "addr:street": False}
+        parser.parse("""
+way|z13-::*
+{
+  linejoin: round;
+}
+""", static_tags=static_tags)
+
+        # Check that mapcss parsed correctly
+        self.assertEqual(len(parser.choosers), 1)
+        styleChooser = parser.choosers[0]
+        self.assertEqual(len(styleChooser.ruleChains), 1)
+        self.assertEqual(styleChooser.selzooms, [13, 19])
+        rule, object_id = styleChooser.testChains({})
+        self.assertEqual(object_id, "::*")
+
+        rule = styleChooser.ruleChains[0]
+        self.assertEqual(rule.subject, 'way')
+        self.assertEqual(rule.extract_tags(), {'*'})
+
 
 if __name__ == '__main__':
     unittest.main()
