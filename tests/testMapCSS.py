@@ -105,6 +105,9 @@ line|z7-9[highway=motorway],
         self.assertEqual(parser.choosers[0].selzooms, [6, 6])
         self.assertEqual(parser.choosers[1].selzooms, [7, 9])
 
+        rule, object_id = parser.choosers[0].testChains({"highway": "trunk"})
+        self.assertEqual(object_id, "::default")
+
     def test_parse_basic_chooser_3(self):
         parser = MapCSS()
         static_tags = {"addr:housenumber": True, "addr:street": False}
@@ -134,25 +137,78 @@ node|z18-[addr:housenumber][addr:street]::int_name
 
     def test_parse_basic_chooser_class(self):
         parser = MapCSS()
-        static_tags = {"addr:housenumber": True, "addr:street": False}
         parser.parse("""
-way|z13-::*
+way|z-13::*
 {
   linejoin: round;
 }
-""", static_tags=static_tags)
+""")
 
         # Check that mapcss parsed correctly
         self.assertEqual(len(parser.choosers), 1)
         styleChooser = parser.choosers[0]
         self.assertEqual(len(styleChooser.ruleChains), 1)
-        self.assertEqual(styleChooser.selzooms, [13, 19])
+        self.assertEqual(styleChooser.selzooms, [0, 13])
         rule, object_id = styleChooser.testChains({})
         self.assertEqual(object_id, "::*")
 
         rule = styleChooser.ruleChains[0]
         self.assertEqual(rule.subject, 'way')
         self.assertEqual(rule.extract_tags(), {'*'})
+
+    def test_parse_basic_chooser_class_2(self):
+        parser = MapCSS()
+        parser.parse("""
+way|z10-::*
+{
+  linejoin: round;
+}
+""")
+
+        # Check that mapcss parsed correctly
+        self.assertEqual(len(parser.choosers), 1)
+        styleChooser = parser.choosers[0]
+        self.assertEqual(len(styleChooser.ruleChains), 1)
+        self.assertEqual(styleChooser.selzooms, [10, 19])
+        rule, object_id = styleChooser.testChains({})
+        self.assertEqual(object_id, "::*")
+
+        rule = styleChooser.ruleChains[0]
+        self.assertEqual(rule.subject, 'way')
+        self.assertEqual(rule.extract_tags(), {'*'})
+
+    def test_parse_basic_chooser_colors(self):
+        parser = MapCSS()
+        parser.parse("""
+way|z-6::*
+{
+  linejoin: round;
+}
+
+colors {
+  GuiText-color: #FFFFFF;
+  GuiText-opacity: 0.7;
+  MyPositionAccuracy-color: #FFFFFF;
+  MyPositionAccuracy-opacity: 0.06;
+  Selection-color: #FFFFFF;
+  Selection-opacity: 0.64;
+  Route-color: #0000FF;
+  RouteOutline-color: #00FFFF;
+}
+""")
+
+        # Check that colors from mapcss parsed correctly
+        colors = parser.get_colors()
+        self.assertEqual(colors, {
+            "GuiText-color": (1.0, 1.0, 1.0),
+            "GuiText-opacity": 0.7,
+            "MyPositionAccuracy-color": (1.0, 1.0, 1.0),
+            "MyPositionAccuracy-opacity": 0.06,
+            "Selection-color": (1.0, 1.0, 1.0),
+            "Selection-opacity": 0.64,
+            "Route-color": (0.0, 0.0, 1.0),
+            "RouteOutline-color": (0.0, 1.0, 1.0)
+        })
 
 
 if __name__ == '__main__':
