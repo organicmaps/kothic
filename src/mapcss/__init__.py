@@ -344,6 +344,7 @@ class MapCSS():
                         import_filename = os.path.join(basepath, IMPORT.match(css).groups()[0])
                         try:
                             css = IMPORT.sub("", css, 1)
+                            # TODO: don't forget to close the file
                             import_text = open(import_filename, "r").read()
                             stck[-1][1] = css # store remained part
                             stck.append([import_filename, import_text, import_text])

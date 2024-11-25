@@ -62,9 +62,18 @@ class MapCSSTest(unittest.TestCase):
             "wave_length": "25"
         })
 
-    def test_parse_include(self):
-        # TODO: Prepare *.mapcss files with @include(...)
-        pass
+    def test_parse_import(self):
+        parser = MapCSS()
+        mapcssFile = Path(__file__).parent / 'assets' / 'case-1-import' / 'main.mapcss'
+        parser.parse(filename=str(mapcssFile))
+
+        colors = parser.get_colors()
+        self.assertEqual(colors, {
+            "GuiText-color": (1.0, 1.0, 1.0),
+            "GuiText-opacity": 0.7,
+            "Route-color": (0.0, 0.0, 1.0),
+            "Route-opacity": 0.5,
+        })
 
     def test_parse_basic_chooser(self):
         parser = MapCSS()
