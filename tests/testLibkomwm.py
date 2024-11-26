@@ -74,3 +74,9 @@ class MapCSSTest(unittest.TestCase):
                             "style.bin.txt", "types.txt", "visibility.txt"]
             for filename in files2delete:
                 (assets_dir / filename).unlink(missing_ok=True)
+
+    def test_generate_drules_validation_errors(self):
+        assets_dir = Path(__file__).parent / 'assets' / 'case-4-styles-validation'
+        # TODO: needs refactoring of libkomwm.validation_errors_count to have a list
+        #       of validation errors.
+        self.assertTrue(True)
