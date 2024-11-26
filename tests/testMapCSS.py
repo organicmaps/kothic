@@ -288,5 +288,77 @@ area|z17-[office=lawyer]
 
         self.assertEqual(styles15, []),
 
+    def test_parser_choosers_tree_with_classes(self):
+        parser = MapCSS()
+        static_tags = {"highway": True}
+
+        parser.parse("""
+line|z10-[highway=motorway]::shield,
+line|z10-[highway=trunk]::shield,
+line|z10-[highway=motorway_link]::shield,
+line|z10-[highway=trunk_link]::shield,
+line|z10-[highway=primary]::shield,
+line|z11-[highway=primary_link]::shield,
+line|z12-[highway=secondary]::shield,
+line|z13-[highway=tertiary]::shield,
+line|z15-[highway=residential]::shield,
+{
+  shield-font-size: 9;
+  shield-text-color: #000000;
+  shield-text-halo-radius: 0;
+  shield-color: #FFFFFF;
+  shield-outline-radius: 1;
+}
+
+line|z12-[highway=residential],
+line|z12-[highway=tertiary],
+line|z18-[highway=tertiary_link]
+{
+  text: name;
+  text-color: #333333;
+  text-halo-opacity: 0.8;
+  text-halo-radius: 1;
+}
+
+line|z12-13[highway=residential],
+line|z12-13[highway=tertiary]
+{
+    font-size: 12;
+    text-color: #444444;
+}
+""", static_tags=static_tags)
+
+        parser.build_choosers_tree("highway", "line", "highway")
+        parser.finalize_choosers_tree()
+
+        # Pick style for zoom = 10
+        styles10 = parser.get_style("highway", "line", {"highway": "primary"},
+                                    zoom=10, xscale=1, zscale=1, filter_by_runtime_conditions=False)
+
+        self.assertEqual(len(styles10), 1),
+        self.assertEqual(styles10[0], {'object-id': '::shield',
+            'shield-font-size': '9',
+            'shield-text-color': (0.0, 0.0, 0.0),
+            'shield-text-halo-radius': 0.0,
+            'shield-color': (1.0, 1.0, 1.0),
+            'shield-outline-radius': 1.0})
+
+        # Pick style for zoom = 15. Expecting two `object-id` values: '::shield' and '::default'
+        styles15 = parser.get_style("highway", "line", {"highway": "tertiary"},
+                                    zoom=15, xscale=1, zscale=1, filter_by_runtime_conditions=False)
+
+        self.assertEqual(len(styles15), 2),
+        self.assertEqual(styles15[0], {'object-id': '::shield',
+                                       'shield-font-size': '9',
+                                       'shield-text-color': (0.0, 0.0, 0.0),
+                                       'shield-text-halo-radius': 0.0,
+                                       'shield-color': (1.0, 1.0, 1.0),
+                                       'shield-outline-radius': 1.0})
+        self.assertEqual(styles15[1], {'object-id': '::default',
+            'text': 'name',
+            'text-color': (51/255, 51/255, 51/255),
+            'text-halo-opacity': 0.8,
+            'text-halo-radius': 1.0})
+
 if __name__ == '__main__':
     unittest.main()
