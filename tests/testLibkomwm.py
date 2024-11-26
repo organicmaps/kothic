@@ -2,17 +2,18 @@ import unittest
 import sys
 from pathlib import Path
 
-from libkomwm import komap_mapswithme
-
 # Add `src` directory to the import paths
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
-class Options(object):
-    pass
+from libkomwm import komap_mapswithme
 
 class MapCSSTest(unittest.TestCase):
     def test_generate_drules(self):
         assets_dir = Path(__file__).parent / 'assets' / 'case-2-generate-drules'
+
+        class Options(object):
+            pass
+
         options = Options()
         options.data = None
         options.minzoom = 0
@@ -22,4 +23,13 @@ class MapCSSTest(unittest.TestCase):
         options.outfile = str( assets_dir / "style.bin" )
         options.priorities_path = str( assets_dir / "include" )
 
-        komap_mapswithme(options)
+        try:
+            komap_mapswithme(options)
+            self.assertTrue(True, "Completed with no errors!")
+            # TODO: Check generated files content
+        finally:
+            # Clean up generated files
+            files2delete = ["classificator.txt", "colors.txt", "patterns.txt", "style.bin.bin",
+                            "style.bin.txt", "types.txt", "visibility.txt"]
+            for filename in files2delete:
+                (assets_dir / filename).unlink(missing_ok=True)
