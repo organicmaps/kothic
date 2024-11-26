@@ -168,6 +168,8 @@ class MapCSS():
                     runtime_rules.append(runtime_conditions)
         return runtime_rules
 
+    # TODO: Renamed to `get_styles` because it returns a list of styles for each class `::XXX`
+    # Refactoring idea: Maybe return dict with `object-id` as a key
     def get_style(self, clname, type, tags, zoom, xscale, zscale, filter_by_runtime_conditions):
         style = []
         if type in self.choosers_by_type_zoom_tag:
@@ -384,7 +386,7 @@ class MapCSS():
             css = stck[-1][1] # remained
             line = css_orig[:-len(css)].count("\n") + 1
             # TODO: Handle filename is None
-            msg = str(e) + "\nFile: " + filename + "\nLine: " + str(line)
+            msg = str(e) + "\nFile: " + str(filename) + "\nLine: " + str(line)
             # TODO: Print stack trace of original exception `e`
             raise Exception(msg)
 

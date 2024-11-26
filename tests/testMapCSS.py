@@ -219,6 +219,74 @@ colors {
             "RouteOutline-color": (0.0, 1.0, 1.0)
         })
 
+    def test_parser_choosers_tree(self):
+        parser = MapCSS()
+        static_tags = {"tourism": True, "office": True,
+                       "craft": True, "amenity": True}
+
+        parser.parse("""
+node|z17-[office=lawyer],
+area|z17-[office=lawyer],
+{text: name;text-color: #444444;text-offset: 1;font-size: 10;}
+
+node|z17-[tourism],
+area|z17-[tourism],
+node|z18-[office],
+area|z18-[office],
+node|z18-[craft],
+area|z18-[craft],
+node|z19-[amenity],
+area|z19-[amenity],
+{text: name; text-color: #000030; text-offset: 1;}
+
+node|z18-[office],
+area|z18-[office],
+node|z18-[craft],
+area|z18-[craft],
+{font-size: 11;}
+
+node|z17-[office=lawyer],
+area|z17-[office=lawyer]
+{icon-image: lawyer-m.svg;}
+""", static_tags=static_tags)
+
+        for obj_type in ["line", "area", "node"]:
+            parser.build_choosers_tree("tourism", obj_type, "tourism")
+            parser.build_choosers_tree("office", obj_type, "office")
+            parser.build_choosers_tree("craft", obj_type, "craft")
+            parser.build_choosers_tree("amenity", obj_type, "amenity")
+
+        parser.finalize_choosers_tree()
+
+        # Pick style for zoom = 17
+        styles18 = parser.get_style("office", "node", {"office": "lawyer"},
+                                    zoom=18, xscale=1, zscale=1, filter_by_runtime_conditions=False)
+
+        self.assertEqual(len(styles18), 1),
+        self.assertEqual(styles18[0], {'object-id': '::default',
+            'font-size': '11',
+            'text': 'name',
+            'text-color': (0, 0, 16*3/255),
+            'text-offset': 1.0,
+            'icon-image': 'lawyer-m.svg'})
+
+        # Pick style for zoom = 17
+        styles17 = parser.get_style("office", "node", {"office": "lawyer"},
+                                    zoom=17, xscale=1, zscale=1, filter_by_runtime_conditions=False)
+
+        self.assertEqual(len(styles17), 1),
+        self.assertEqual(styles17[0], {'object-id': '::default',
+            'font-size': '10',
+            'text': 'name',
+            'text-color': (68/255, 68/255, 68/255),
+            'text-offset': 1.0,
+            'icon-image': 'lawyer-m.svg'})
+
+        # Pick style for zoom = 15
+        styles15 = parser.get_style("office", "node", {"office": "lawyer"},
+                                    zoom=15, xscale=1, zscale=1, filter_by_runtime_conditions=False)
+
+        self.assertEqual(styles15, []),
 
 if __name__ == '__main__':
     unittest.main()
