@@ -458,6 +458,7 @@ def get_drape_priority(cl, dr_type, object_id, auto_dr_type = None, auto_comment
     return 0
 
 
+# TODO: Split large function to smaller ones
 def komap_mapswithme(options):
     if options.data and os.path.isdir(options.data):
         ddir = options.data
