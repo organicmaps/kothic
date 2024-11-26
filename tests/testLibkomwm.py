@@ -26,12 +26,15 @@ class MapCSSTest(unittest.TestCase):
 
         try:
             # Save state
+            libkomwm.MULTIPROCESSING = False
             prio_ranges_orig = libkomwm.prio_ranges.copy()
 
             komap_mapswithme(options)
 
             # Restore state
             libkomwm.prio_ranges = prio_ranges_orig
+            libkomwm.MULTIPROCESSING = True
+
             self.assertTrue(True, "Completed with no errors!")
             # TODO: Check generated files content
         finally:
@@ -66,6 +69,7 @@ class MapCSSTest(unittest.TestCase):
             # Restore state
             libkomwm.prio_ranges = prio_ranges_orig
             libkomwm.MULTIPROCESSING = True
+
             self.assertTrue(True, "Completed with no errors!")
             # TODO: Check generated files content
         finally:
