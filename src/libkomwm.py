@@ -104,6 +104,9 @@ def mwm_encode_color(colors, st, prefix='', default='black'):
     if prefix:
         prefix += "-"
     opacity = hex(255 - int(255 * float(st.get(prefix + "opacity", 1))))
+    # TODO: Refactoring idea: here color is converted from float to hex. While MapCSS class
+    #       reads colors from *.mapcss files and converts to float. How about changing MapCSS
+    #       to keep hex values and avoid Hex->Float->Hex operations?
     color = whatever_to_hex(st.get(prefix + 'color', default))[1:]
     result = int(opacity + color, 16)
     colors.add(result)
@@ -118,6 +121,7 @@ def mwm_encode_image(st, prefix='icon', bgprefix='symbol'):
         return False
     # strip last ".svg"
     handle = st.get(prefix + "image")[:-4]
+    # TODO: return `handle` only once
     return handle, handle
 
 
@@ -464,6 +468,7 @@ def komap_mapswithme(options):
     class_order = []
     class_tree = {}
 
+    # TODO: Introduce new function to parse `colors.txt` for better testability
     colors_file_name = os.path.join(ddir, 'colors.txt')
     colors = set()
     if os.path.exists(colors_file_name):
@@ -472,6 +477,7 @@ def komap_mapswithme(options):
             colors.add(int(colorLine))
         colors_in_file.close()
 
+    # TODO: Introduce new function to parse `patterns.txt` for better testability
     patterns = []
     def addPattern(dashes):
         if dashes and dashes not in patterns:
@@ -488,6 +494,7 @@ def komap_mapswithme(options):
     types_file = open(os.path.join(ddir, 'types.txt'), "w")
 
     # The mapcss-mapping.csv format is described inside the file itself.
+    # TODO: introduce new function to parse 'mapcss-mapping.csv' for better testability
     cnt = 1
     unique_types_check = set()
     for row in csv.reader(open(os.path.join(ddir, 'mapcss-mapping.csv')), delimiter=';'):
@@ -505,6 +512,7 @@ def komap_mapswithme(options):
         if int(row[5]) < cnt:
             raise Exception('Wrong type id: {0}'.format(';'.join(row)))
         while int(row[5]) > cnt:
+            # TODO: Why do we have those lines in `types.txt`? What if remove print(...) statement?
             print("mapswithme", file=types_file)
             cnt += 1
         cnt += 1
@@ -534,6 +542,7 @@ def komap_mapswithme(options):
             if row[6]:
                 print(row[6], file=types_file)
             else:
+                # TODO: Why do we have those lines in `types.txt`? What if remove print(...) statement?
                 print("mapswithme", file=types_file)
         class_tree[cl] = row[0]
     class_order.sort()
@@ -554,6 +563,7 @@ def komap_mapswithme(options):
         for i, t in enumerate(v.keys()):
             mapcss_static_tags[t] = mapcss_static_tags.get(t, True) and i == 0
 
+    # TODO: Introduce new function to parse `mapcss-dynamic.txt` for better testability
     # Get all mapcss dynamic tags from mapcss-dynamic.txt
     mapcss_dynamic_tags = set([line.rstrip() for line in open(os.path.join(ddir, 'mapcss-dynamic.txt'))])
 
@@ -579,6 +589,7 @@ def komap_mapswithme(options):
 
     style.finalize_choosers_tree()
 
+    # TODO: Introduce new function to work with colors for better testability
     # Get colors section from style
     style_colors = {}
     raw_style_colors = style.get_colors()
@@ -616,6 +627,7 @@ def komap_mapswithme(options):
 
     all_draw_elements = set()
 
+    # TODO: refactor next for-loop for readability and testability
     global validation_errors_count
     for results in imapfunc(query_style, ((cl, classificator[cl], options.minzoom, options.maxzoom) for cl in class_order)):
         for result in results:
@@ -920,6 +932,7 @@ def komap_mapswithme(options):
         return -1
     viskeys.sort(key=functools.cmp_to_key(cmprepl))
 
+    # TODO: Introduce new function to dump `visibility.txt` and `classificator.txt` for better testability
     visibility_file = open(os.path.join(ddir, 'visibility.txt'), "w")
     classificator_file = open(os.path.join(ddir, 'classificator.txt'), "w")
 
@@ -942,11 +955,13 @@ def komap_mapswithme(options):
     visibility_file.close()
     classificator_file.close()
 
+    # TODO: Introduce new function to dump `colors.txt` for better testability
     colors_file = open(colors_file_name, "w")
     for c in sorted(colors):
         colors_file.write("%d\n" % (c))
     colors_file.close()
 
+    # TODO: Introduce new function to dump `patterns.txt` for better testability
     patterns_file = open(patterns_file_name, "w")
     for p in patterns:
         patterns_file.write("%s\n" % (' '.join(str(elem) for elem in p)))

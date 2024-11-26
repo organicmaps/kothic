@@ -349,11 +349,11 @@ line|z12-13[highway=tertiary]
 
         self.assertEqual(len(styles15), 2),
         self.assertEqual(styles15[0], {'object-id': '::shield',
-                                       'shield-font-size': '9',
-                                       'shield-text-color': (0.0, 0.0, 0.0),
-                                       'shield-text-halo-radius': 0.0,
-                                       'shield-color': (1.0, 1.0, 1.0),
-                                       'shield-outline-radius': 1.0})
+            'shield-font-size': '9',
+            'shield-text-color': (0.0, 0.0, 0.0),
+            'shield-text-halo-radius': 0.0,
+            'shield-color': (1.0, 1.0, 1.0),
+            'shield-outline-radius': 1.0})
         self.assertEqual(styles15[1], {'object-id': '::default',
             'text': 'name',
             'text-color': (51/255, 51/255, 51/255),
