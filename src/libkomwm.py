@@ -89,6 +89,7 @@ Priorities ranges' rendering order overview:
 - BG-by-size: landcover areas sorted by their size
 '''
 
+# TODO: Implement better error handling
 validation_errors_count = 0
 
 def to_boolean(s):
