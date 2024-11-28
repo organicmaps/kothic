@@ -12,39 +12,6 @@
 # - BG-top: water (linear and areal)
 # - BG-by-size: landcover areas sorted by their size
 
-aerialway-cable_car::dash                           # WARNING: no style defined (the type will be not included into map data)
-aerialway-chair_lift::dash                          # WARNING: no style defined (the type will be not included into map data)
-aerialway-drag_lift::dash                           # WARNING: no style defined (the type will be not included into map data)
-aerialway-gondola::dash                             # WARNING: no style defined (the type will be not included into map data)
-aerialway-j-bar::dash                               # WARNING: no style defined (the type will be not included into map data)
-aerialway-magic_carpet::dash                        # WARNING: no style defined (the type will be not included into map data)
-aerialway-mixed_lift::dash                          # WARNING: no style defined (the type will be not included into map data)
-aerialway-platter::dash                             # WARNING: no style defined (the type will be not included into map data)
-aerialway-rope_tow::dash                            # WARNING: no style defined (the type will be not included into map data)
-aerialway-t-bar::dash                               # WARNING: no style defined (the type will be not included into map data)
-=== 380
-
-aerialway-cable_car                                 # WARNING: no style defined (the type will be not included into map data)
-aerialway-chair_lift                                # WARNING: no style defined (the type will be not included into map data)
-aerialway-drag_lift                                 # WARNING: no style defined (the type will be not included into map data)
-aerialway-gondola                                   # WARNING: no style defined (the type will be not included into map data)
-aerialway-j-bar                                     # WARNING: no style defined (the type will be not included into map data)
-aerialway-magic_carpet                              # WARNING: no style defined (the type will be not included into map data)
-aerialway-mixed_lift                                # WARNING: no style defined (the type will be not included into map data)
-aerialway-platter                                   # WARNING: no style defined (the type will be not included into map data)
-aerialway-rope_tow                                  # WARNING: no style defined (the type will be not included into map data)
-aerialway-t-bar                                     # WARNING: no style defined (the type will be not included into map data)
-=== 370
-
-historic-citywalls                                  # WARNING: no style defined (the type will be not included into map data)
-=== 360
-
-power-line                                          # WARNING: no style defined (the type will be not included into map data)
-=== 350
-
-power-line::dash                                    # WARNING: no style defined (the type will be not included into map data)
-=== 340
-
 highway-cycleway                                    # line z13- (also has pathtext z15-)
 highway-cycleway-bridge                             # line z13- (also has line::bridgeblack z17-, line::bridgewhite z15-, pathtext z15-)
 highway-cycleway-tunnel                             # line z13- (also has line::tunnelBackground z17-, line::tunnelCasing z17-, pathtext z15-)
@@ -52,27 +19,7 @@ highway-footway-crossing                            # line z16-
 highway-steps                                       # line z15- (also has pathtext z16-)
 highway-steps-bridge                                # line z15- (also has line::bridgeblack z17-, line::bridgewhite z15-, pathtext z16-)
 highway-steps-tunnel                                # line z15- (also has line::tunnelBackground z17-, line::tunnelCasing z17-, pathtext z16-)
-hwtag-oneway::arrows                                # WARNING: no style defined (the type will be not included into map data)
-waterway-weir                                       # WARNING: no style defined (the type will be not included into map data)
 === 330
-
-barrier-city_wall                                   # WARNING: no style defined (the type will be not included into map data)
-barrier-fence                                       # WARNING: no style defined (the type will be not included into map data)
-barrier-hedge                                       # WARNING: no style defined (the type will be not included into map data)
-barrier-wall                                        # WARNING: no style defined (the type will be not included into map data)
-railway-funicular                                   # WARNING: no style defined (the type will be not included into map data)
-railway-funicular-bridge                            # WARNING: no style defined (the type will be not included into map data)
-railway-funicular-tunnel                            # WARNING: no style defined (the type will be not included into map data)
-railway-monorail                                    # WARNING: no style defined (the type will be not included into map data)
-railway-monorail-bridge                             # WARNING: no style defined (the type will be not included into map data)
-railway-monorail-tunnel                             # WARNING: no style defined (the type will be not included into map data)
-railway-narrow_gauge                                # WARNING: no style defined (the type will be not included into map data)
-railway-narrow_gauge-bridge                         # WARNING: no style defined (the type will be not included into map data)
-railway-narrow_gauge-tunnel                         # WARNING: no style defined (the type will be not included into map data)
-railway-tram                                        # WARNING: no style defined (the type will be not included into map data)
-railway-tram-bridge                                 # WARNING: no style defined (the type will be not included into map data)
-railway-tram-tunnel                                 # WARNING: no style defined (the type will be not included into map data)
-=== 320
 
 highway-motorway                                    # line z6- (also has pathtext z10-, shield::shield z10-)
 highway-motorway-bridge                             # line z6- (also has line::bridgeblack z13-, line::bridgewhite z13-, pathtext z10-, shield::shield z10-)
@@ -91,36 +38,10 @@ highway-world_towns_level                           # line z6-9
 highway-primary                                     # line z8- (also has pathtext z10-, shield::shield z10-)
 highway-primary-bridge                              # line z8- (also has line::bridgeblack z14-, line::bridgewhite z14-, pathtext z10-, shield::shield z10-)
 highway-primary-tunnel                              # line z8- (also has line(casing) z14-, pathtext z10-, shield::shield z10-)
-railway-rail-branch::dash                           # WARNING: no style defined (the type will be not included into map data)
-railway-rail-branch-bridge::dash                    # WARNING: no style defined (the type will be not included into map data)
-railway-rail-branch-tunnel::dash                    # WARNING: no style defined (the type will be not included into map data)
-railway-rail-highspeed::dash                        # WARNING: no style defined (the type will be not included into map data)
-railway-rail-highspeed-bridge::dash                 # WARNING: no style defined (the type will be not included into map data)
-railway-rail-highspeed-tunnel::dash                 # WARNING: no style defined (the type will be not included into map data)
-railway-rail-main::dash                             # WARNING: no style defined (the type will be not included into map data)
-railway-rail-main-bridge::dash                      # WARNING: no style defined (the type will be not included into map data)
-railway-rail-main-tunnel::dash                      # WARNING: no style defined (the type will be not included into map data)
-railway-rail-tourism::dash                          # WARNING: no style defined (the type will be not included into map data)
-railway-rail-tourism-bridge::dash                   # WARNING: no style defined (the type will be not included into map data)
-railway-rail-tourism-tunnel::dash                   # WARNING: no style defined (the type will be not included into map data)
 === 290
 
 # highway-primary-tunnel                            # line(casing) z14- (also has line z8-, pathtext z10-, shield::shield z10-)
 # === 289
-
-railway-rail-branch                                 # WARNING: no style defined (the type will be not included into map data)
-railway-rail-branch-bridge                          # WARNING: no style defined (the type will be not included into map data)
-railway-rail-branch-tunnel                          # WARNING: no style defined (the type will be not included into map data)
-railway-rail-highspeed                              # WARNING: no style defined (the type will be not included into map data)
-railway-rail-highspeed-bridge                       # WARNING: no style defined (the type will be not included into map data)
-railway-rail-highspeed-tunnel                       # WARNING: no style defined (the type will be not included into map data)
-railway-rail-main                                   # WARNING: no style defined (the type will be not included into map data)
-railway-rail-main-bridge                            # WARNING: no style defined (the type will be not included into map data)
-railway-rail-main-tunnel                            # WARNING: no style defined (the type will be not included into map data)
-railway-rail-tourism                                # WARNING: no style defined (the type will be not included into map data)
-railway-rail-tourism-bridge                         # WARNING: no style defined (the type will be not included into map data)
-railway-rail-tourism-tunnel                         # WARNING: no style defined (the type will be not included into map data)
-=== 280
 
 highway-secondary                                   # line z10- (also has pathtext z10-, shield::shield z12-)
 highway-secondary-bridge                            # line z10- (also has line::bridgeblack z14-, line::bridgewhite z14-, pathtext z10-, shield::shield z12-)
@@ -195,42 +116,6 @@ highway-tertiary_link-tunnel                        # line z14- (also has line(c
 # highway-tertiary_link-tunnel                      # line(casing) z16- (also has line z14-, pathtext z18-)
 # === 221
 
-railway-light_rail::dash                            # WARNING: no style defined (the type will be not included into map data)
-railway-light_rail-bridge::dash                     # WARNING: no style defined (the type will be not included into map data)
-railway-rail::dash                                  # WARNING: no style defined (the type will be not included into map data)
-railway-rail-bridge::dash                           # WARNING: no style defined (the type will be not included into map data)
-railway-rail-service::dash                          # WARNING: no style defined (the type will be not included into map data)
-railway-rail-service-bridge::dash                   # WARNING: no style defined (the type will be not included into map data)
-railway-rail-service-tunnel::dash                   # WARNING: no style defined (the type will be not included into map data)
-railway-rail-spur::dash                             # WARNING: no style defined (the type will be not included into map data)
-railway-rail-spur-bridge::dash                      # WARNING: no style defined (the type will be not included into map data)
-railway-rail-spur-tunnel::dash                      # WARNING: no style defined (the type will be not included into map data)
-railway-rail-tunnel::dash                           # WARNING: no style defined (the type will be not included into map data)
-railway-rail-utility::dash                          # WARNING: no style defined (the type will be not included into map data)
-railway-rail-utility-bridge::dash                   # WARNING: no style defined (the type will be not included into map data)
-railway-rail-utility-tunnel::dash                   # WARNING: no style defined (the type will be not included into map data)
-railway-subway::dash                                # WARNING: no style defined (the type will be not included into map data)
-railway-subway-bridge::dash                         # WARNING: no style defined (the type will be not included into map data)
-=== 220
-
-railway-light_rail                                  # WARNING: no style defined (the type will be not included into map data)
-railway-light_rail-bridge                           # WARNING: no style defined (the type will be not included into map data)
-railway-rail                                        # WARNING: no style defined (the type will be not included into map data)
-railway-rail-bridge                                 # WARNING: no style defined (the type will be not included into map data)
-railway-rail-service                                # WARNING: no style defined (the type will be not included into map data)
-railway-rail-service-bridge                         # WARNING: no style defined (the type will be not included into map data)
-railway-rail-service-tunnel                         # WARNING: no style defined (the type will be not included into map data)
-railway-rail-spur                                   # WARNING: no style defined (the type will be not included into map data)
-railway-rail-spur-bridge                            # WARNING: no style defined (the type will be not included into map data)
-railway-rail-spur-tunnel                            # WARNING: no style defined (the type will be not included into map data)
-railway-rail-tunnel                                 # WARNING: no style defined (the type will be not included into map data)
-railway-rail-utility                                # WARNING: no style defined (the type will be not included into map data)
-railway-rail-utility-bridge                         # WARNING: no style defined (the type will be not included into map data)
-railway-rail-utility-tunnel                         # WARNING: no style defined (the type will be not included into map data)
-railway-subway                                      # WARNING: no style defined (the type will be not included into map data)
-railway-subway-bridge                               # WARNING: no style defined (the type will be not included into map data)
-=== 210
-
 highway-ford                                        # line z13- (also has icon z16-, pathtext z16-)
 highway-pedestrian                                  # line z13- (also has pathtext z14-)
 highway-pedestrian-area                             # line z13- (also has pathtext z14-)
@@ -275,15 +160,6 @@ highway-path-bicycle::cycleline                     # line::cycleline z14- (also
 === 170
 
 highway-construction                                # line z13- (also has pathtext z15-)
-leisure-track                                       # WARNING: no style defined (the type will be not included into map data)
-railway-abandoned                                   # WARNING: no style defined (the type will be not included into map data)
-railway-abandoned-bridge                            # WARNING: no style defined (the type will be not included into map data)
-railway-abandoned-tunnel                            # WARNING: no style defined (the type will be not included into map data)
-railway-construction                                # WARNING: no style defined (the type will be not included into map data)
-railway-disused                                     # WARNING: no style defined (the type will be not included into map data)
-railway-preserved                                   # WARNING: no style defined (the type will be not included into map data)
-railway-preserved-bridge                            # WARNING: no style defined (the type will be not included into map data)
-railway-preserved-tunnel                            # WARNING: no style defined (the type will be not included into map data)
 === 160
 
 highway-footway-bridge                              # line z15- (also has line::bridgeblack z17-, line::bridgewhite z15-, pathtext z15-)
@@ -315,17 +191,6 @@ highway-track-bridge::bridgewhite                   # line::bridgewhite z15- (al
 highway-trunk-bridge::bridgewhite                   # line::bridgewhite z13- (also has line z6-, line::bridgeblack z13-, pathtext z10-, shield::shield z10-)
 highway-trunk_link-bridge::bridgewhite              # line::bridgewhite z14- (also has line z10-, line::bridgeblack z14-, pathtext z10-, shield::shield z10-)
 highway-unclassified-bridge::bridgewhite            # line::bridgewhite z14- (also has line z11-, line::bridgeblack z14-, pathtext z13-)
-railway-abandoned-bridge::bridgewhite               # WARNING: no style defined (the type will be not included into map data)
-railway-preserved-bridge::bridgewhite               # WARNING: no style defined (the type will be not included into map data)
-railway-rail-branch-bridge::bridgewhite             # WARNING: no style defined (the type will be not included into map data)
-railway-rail-bridge::bridgewhite                    # WARNING: no style defined (the type will be not included into map data)
-railway-rail-highspeed-bridge::bridgewhite          # WARNING: no style defined (the type will be not included into map data)
-railway-rail-main-bridge::bridgewhite               # WARNING: no style defined (the type will be not included into map data)
-railway-rail-service-bridge::bridgewhite            # WARNING: no style defined (the type will be not included into map data)
-railway-rail-spur-bridge::bridgewhite               # WARNING: no style defined (the type will be not included into map data)
-railway-rail-tourism-bridge::bridgewhite            # WARNING: no style defined (the type will be not included into map data)
-railway-rail-utility-bridge::bridgewhite            # WARNING: no style defined (the type will be not included into map data)
-railway-subway-bridge::bridgewhite                  # WARNING: no style defined (the type will be not included into map data)
 === 150
 
 highway-bridleway-bridge::bridgeblack               # line::bridgeblack z17- (also has line z14-, line::bridgewhite z15-, pathtext z15-)
@@ -349,70 +214,7 @@ highway-track-bridge::bridgeblack                   # line::bridgeblack z17- (al
 highway-trunk-bridge::bridgeblack                   # line::bridgeblack z13- (also has line z6-, line::bridgewhite z13-, pathtext z10-, shield::shield z10-)
 highway-trunk_link-bridge::bridgeblack              # line::bridgeblack z14- (also has line z10-, line::bridgewhite z14-, pathtext z10-, shield::shield z10-)
 highway-unclassified-bridge::bridgeblack            # line::bridgeblack z14- (also has line z11-, line::bridgewhite z14-, pathtext z13-)
-railway-abandoned-bridge::bridgeblack               # WARNING: no style defined (the type will be not included into map data)
-railway-preserved-bridge::bridgeblack               # WARNING: no style defined (the type will be not included into map data)
-railway-rail-branch-bridge::bridgeblack             # WARNING: no style defined (the type will be not included into map data)
-railway-rail-bridge::bridgeblack                    # WARNING: no style defined (the type will be not included into map data)
-railway-rail-highspeed-bridge::bridgeblack          # WARNING: no style defined (the type will be not included into map data)
-railway-rail-main-bridge::bridgeblack               # WARNING: no style defined (the type will be not included into map data)
-railway-rail-service-bridge::bridgeblack            # WARNING: no style defined (the type will be not included into map data)
-railway-rail-spur-bridge::bridgeblack               # WARNING: no style defined (the type will be not included into map data)
-railway-rail-tourism-bridge::bridgeblack            # WARNING: no style defined (the type will be not included into map data)
-railway-rail-utility-bridge::bridgeblack            # WARNING: no style defined (the type will be not included into map data)
-railway-subway-bridge::bridgeblack                  # WARNING: no style defined (the type will be not included into map data)
 === 140
-
-building                                            # WARNING: no style defined (the type will be not included into map data)
-building-garage                                     # WARNING: no style defined (the type will be not included into map data)
-building-has_parts                                  # WARNING: no style defined (the type will be not included into map data)
-building-train_station                              # WARNING: no style defined (the type will be not included into map data)
-=== 130
-
-piste:type-connection                               # WARNING: no style defined (the type will be not included into map data)
-piste:type-downhill                                 # WARNING: no style defined (the type will be not included into map data)
-piste:type-downhill-advanced                        # WARNING: no style defined (the type will be not included into map data)
-piste:type-downhill-easy                            # WARNING: no style defined (the type will be not included into map data)
-piste:type-downhill-expert                          # WARNING: no style defined (the type will be not included into map data)
-piste:type-downhill-freeride                        # WARNING: no style defined (the type will be not included into map data)
-piste:type-downhill-intermediate                    # WARNING: no style defined (the type will be not included into map data)
-piste:type-downhill-novice                          # WARNING: no style defined (the type will be not included into map data)
-piste:type-hike                                     # WARNING: no style defined (the type will be not included into map data)
-piste:type-nordic                                   # WARNING: no style defined (the type will be not included into map data)
-piste:type-skitour                                  # WARNING: no style defined (the type will be not included into map data)
-piste:type-sled                                     # WARNING: no style defined (the type will be not included into map data)
-=== 120
-
-building:part                                       # WARNING: no style defined (the type will be not included into map data)
-landuse-garages                                     # WARNING: no style defined (the type will be not included into map data)
-=== 110
-
-barrier-retaining_wall                              # WARNING: no style defined (the type will be not included into map data)
-man_made-embankment                                 # WARNING: no style defined (the type will be not included into map data)
-natural-cliff                                       # WARNING: no style defined (the type will be not included into map data)
-natural-earth_bank                                  # WARNING: no style defined (the type will be not included into map data)
-=== 100
-
-boundary-administrative-2                           # WARNING: no style defined (the type will be not included into map data)
-boundary-administrative-3                           # WARNING: no style defined (the type will be not included into map data)
-boundary-administrative-4                           # WARNING: no style defined (the type will be not included into map data)
-=== 90
-
-man_made-cutline                                    # WARNING: no style defined (the type will be not included into map data)
-route-ferry                                         # WARNING: no style defined (the type will be not included into map data)
-=== 80
-
-aeroway-runway                                      # WARNING: no style defined (the type will be not included into map data)
-aeroway-taxiway                                     # WARNING: no style defined (the type will be not included into map data)
-barrier-ditch                                       # WARNING: no style defined (the type will be not included into map data)
-=== 70
-
-isoline-step_10                                     # WARNING: no style defined (the type will be not included into map data)
-isoline-step_100                                    # WARNING: no style defined (the type will be not included into map data)
-isoline-step_1000                                   # WARNING: no style defined (the type will be not included into map data)
-isoline-step_50                                     # WARNING: no style defined (the type will be not included into map data)
-isoline-step_500                                    # WARNING: no style defined (the type will be not included into map data)
-isoline-zero                                        # WARNING: no style defined (the type will be not included into map data)
-=== 60
 
 highway-bridleway-tunnel::tunnelBackground          # line::tunnelBackground z17- (also has line z14-, line::tunnelCasing z17-, pathtext z15-)
 highway-cycleway-tunnel::tunnelBackground           # line::tunnelBackground z17- (also has line z13-, line::tunnelCasing z17-, pathtext z15-)
@@ -420,7 +222,6 @@ highway-footway-tunnel::tunnelBackground            # line::tunnelBackground z17
 highway-path-tunnel::tunnelBackground               # line::tunnelBackground z17- (also has line z14-, line::tunnelCasing z17-, pathtext z15-)
 highway-steps-tunnel::tunnelBackground              # line::tunnelBackground z17- (also has line z15-, line::tunnelCasing z17-, pathtext z16-)
 highway-track-tunnel::tunnelBackground              # line::tunnelBackground z17- (also has line z14-, line::tunnelCasing z17-, pathtext z15-)
-railway-light_rail-bridge::bridgewhite              # WARNING: no style defined (the type will be not included into map data)
 === 50
 
 highway-bridleway-tunnel::tunnelCasing              # line::tunnelCasing z17- (also has line z14-, line::tunnelBackground z17-, pathtext z15-)
@@ -429,25 +230,4 @@ highway-footway-tunnel::tunnelCasing                # line::tunnelCasing z17- (a
 highway-path-tunnel::tunnelCasing                   # line::tunnelCasing z17- (also has line z14-, line::tunnelBackground z17-, pathtext z15-)
 highway-steps-tunnel::tunnelCasing                  # line::tunnelCasing z17- (also has line z15-, line::tunnelBackground z17-, pathtext z16-)
 highway-track-tunnel::tunnelCasing                  # line::tunnelCasing z17- (also has line z14-, line::tunnelBackground z17-, pathtext z15-)
-railway-light_rail-bridge::bridgeblack              # WARNING: no style defined (the type will be not included into map data)
 === 40
-
-man_made-breakwater                                 # WARNING: no style defined (the type will be not included into map data)
-man_made-pier                                       # WARNING: no style defined (the type will be not included into map data)
-waterway-dam                                        # WARNING: no style defined (the type will be not included into map data)
-=== 30
-
-amenity-prison                                      # WARNING: no style defined (the type will be not included into map data)
-boundary-aboriginal_lands                           # WARNING: no style defined (the type will be not included into map data)
-boundary-national_park                              # WARNING: no style defined (the type will be not included into map data)
-boundary-protected_area-1                           # WARNING: no style defined (the type will be not included into map data)
-landuse-military                                    # WARNING: no style defined (the type will be not included into map data)
-landuse-military-danger_area                        # WARNING: no style defined (the type will be not included into map data)
-leisure-nature_reserve                              # WARNING: no style defined (the type will be not included into map data)
-=== 20
-
-piste:type-snow_park                                # WARNING: no style defined (the type will be not included into map data)
-=== 15
-
-man_made-bridge                                     # WARNING: no style defined (the type will be not included into map data)
-=== 10

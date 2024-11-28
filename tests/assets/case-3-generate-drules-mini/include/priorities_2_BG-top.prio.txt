@@ -16,31 +16,3 @@
 # - BG-top: water (linear and areal)
 # - BG-by-size: landcover areas sorted by their size
 
-landuse-basin                                       # WARNING: no style defined (the type will be not included into map data)
-landuse-reservoir                                   # WARNING: no style defined (the type will be not included into map data)
-landuse-salt_pond                                   # WARNING: no style defined (the type will be not included into map data)
-natural-water                                       # WARNING: no style defined (the type will be not included into map data)
-natural-water-basin                                 # WARNING: no style defined (the type will be not included into map data)
-natural-water-ditch                                 # WARNING: no style defined (the type will be not included into map data)
-natural-water-drain                                 # WARNING: no style defined (the type will be not included into map data)
-natural-water-lake                                  # WARNING: no style defined (the type will be not included into map data)
-natural-water-lock                                  # WARNING: no style defined (the type will be not included into map data)
-natural-water-moat                                  # WARNING: no style defined (the type will be not included into map data)
-natural-water-pond                                  # WARNING: no style defined (the type will be not included into map data)
-natural-water-reservoir                             # WARNING: no style defined (the type will be not included into map data)
-natural-water-river                                 # WARNING: no style defined (the type will be not included into map data)
-natural-water-tunnel                                # WARNING: no style defined (the type will be not included into map data)
-natural-water-wastewater                            # WARNING: no style defined (the type will be not included into map data)
-waterway-dock                                       # WARNING: no style defined (the type will be not included into map data)
-=== 20
-
-natural-strait                                      # WARNING: no style defined (the type will be not included into map data)
-waterway-canal                                      # WARNING: no style defined (the type will be not included into map data)
-waterway-ditch                                      # WARNING: no style defined (the type will be not included into map data)
-waterway-drain                                      # WARNING: no style defined (the type will be not included into map data)
-waterway-fish_pass                                  # WARNING: no style defined (the type will be not included into map data)
-waterway-river                                      # WARNING: no style defined (the type will be not included into map data)
-waterway-stream                                     # WARNING: no style defined (the type will be not included into map data)
-waterway-stream-ephemeral                           # WARNING: no style defined (the type will be not included into map data)
-waterway-stream-intermittent                        # WARNING: no style defined (the type will be not included into map data)
-=== 10
