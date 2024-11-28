@@ -79,10 +79,7 @@ class LibKomwmTest(unittest.TestCase):
 
             # Check that types.txt contains 1173 lines
             with open(assets_dir / "types.txt", "rt") as typesFile:
-                num_lines = 0
-                for _ in typesFile:
-                    num_lines += 1
-                self.assertEqual(num_lines, 1173, "Generated types.txt file should contain 1173 lines")
+                self.assertEqual(len(list(typesFile)), 1173, "Generated types.txt file should contain 1173 lines")
 
             # Check that style_output.bin has 20 styles
             with open(assets_dir / "style_output.bin", "rb") as protobuf_file:
