@@ -1,6 +1,7 @@
 import unittest
 import sys
 from pathlib import Path
+from copy import deepcopy
 
 # Add `src` directory to the import paths
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
@@ -8,7 +9,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 import libkomwm
 from libkomwm import komap_mapswithme
 
-class MapCSSTest(unittest.TestCase):
+
+class LibKomwmTest(unittest.TestCase):
     def test_generate_drules(self):
         assets_dir = Path(__file__).parent / 'assets' / 'case-2-generate-drules'
 
@@ -27,16 +29,18 @@ class MapCSSTest(unittest.TestCase):
         try:
             # Save state
             libkomwm.MULTIPROCESSING = False
-            prio_ranges_orig = libkomwm.prio_ranges.copy()
+            prio_ranges_orig = deepcopy(libkomwm.prio_ranges)
+            libkomwm.visibilities = {}
 
+            # Run style generation
             komap_mapswithme(options)
 
             # Restore state
             libkomwm.prio_ranges = prio_ranges_orig
             libkomwm.MULTIPROCESSING = True
+            libkomwm.visibilities = {}
 
             self.assertTrue(True, "Completed with no errors!")
-            # TODO: Check generated files content
         finally:
             # Clean up generated files
             files2delete = ["classificator.txt", "colors.txt", "patterns.txt", "style.bin.bin",
@@ -62,21 +66,36 @@ class MapCSSTest(unittest.TestCase):
         try:
             # Save state
             libkomwm.MULTIPROCESSING = False
-            prio_ranges_orig = libkomwm.prio_ranges.copy()
+            prio_ranges_orig = deepcopy(libkomwm.prio_ranges)
+            libkomwm.visibilities = {}
 
+            # Run style generation
             komap_mapswithme(options)
 
             # Restore state
             libkomwm.prio_ranges = prio_ranges_orig
             libkomwm.MULTIPROCESSING = True
+            libkomwm.visibilities = {}
 
-            self.assertTrue(True, "Completed with no errors!")
-            # TODO: Check that types.txt contains 1173 lines
-            # TODO: Check that style_output.bin has 20 styles
+            # Check that types.txt contains 1173 lines
+            with open(assets_dir / "types.txt", "rt") as typesFile:
+                num_lines = 0
+                for _ in typesFile:
+                    num_lines += 1
+                self.assertEqual(num_lines, 1173, "Generated types.txt file should contain 1173 lines")
+
+            # Check that style_output.bin has 20 styles
+            with open(assets_dir / "style_output.bin", "rb") as protobuf_file:
+                protobuf_data = protobuf_file.read()
+            drules = libkomwm.ContainerProto()
+            drules.ParseFromString(protobuf_data)
+
+            self.assertEqual(len(drules.cont), 20, "Generated style_output.bin should contain 20 styles")
+
         finally:
             # Clean up generated files
-            files2delete = ["classificator.txt", "colors.txt", "patterns.txt", "style.bin.bin",
-                            "style.bin.txt", "types.txt", "visibility.txt"]
+            files2delete = ["classificator.txt", "colors.txt", "patterns.txt", "style_output.bin",
+                            "style_output.txt", "types.txt", "visibility.txt"]
             for filename in files2delete:
                 (assets_dir / filename).unlink(missing_ok=True)
 
