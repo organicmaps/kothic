@@ -102,6 +102,7 @@ class MapCSS():
         self.choosers_by_type = {}
         self.choosers_by_type_zoom_tag = {}
         self.variables = {}
+        self.unused_variables = set()
         self.style_loaded = False
 
     def parseZoom(self, s):
@@ -214,6 +215,8 @@ class MapCSS():
 
     def get_variable(self, m):
         name = m.group()[1:]
+        if name in self.unused_variables:
+            self.unused_variables.remove(name)
         if not name in self.variables:
             raise Exception("Variable not found: " + str(format(name)))
         return self.variables[name] if name in self.variables else m.group()
@@ -360,6 +363,7 @@ class MapCSS():
                         name = VARIABLE_SET.match(css).groups()[0]
                         log.debug("variable set found: %s" % name)
                         self.variables[name] = VARIABLE_SET.match(css).groups()[1]
+                        self.unused_variables.add( name )
                         css = VARIABLE_SET.sub("", css, 1)
                         previous = oVARIABLE_SET
 
@@ -419,6 +423,10 @@ class MapCSS():
                     self.choosers_by_type[t] = [chooser]
                 else:
                     self.choosers_by_type[t].append(chooser)
+
+        if self.unused_variables:
+            # TODO: Do not print warning here. Instead let libkomwn.komap_mapswithme(...) analyze unused_variables
+            print(f"Warning: Unused variables: {', '.join(self.unused_variables)}")
 
 # TODO: move to Condition.py
 def parseCondition(s):
