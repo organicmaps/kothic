@@ -53,10 +53,10 @@ class MapCSSTest(unittest.TestCase):
         options = Options()
         options.data = None
         options.minzoom = 0
-        options.maxzoom = 20
+        options.maxzoom = 10
         options.txt = True
         options.filename = str( assets_dir / "main.mapcss" )
-        options.outfile = str( assets_dir / "style.bin" )
+        options.outfile = str( assets_dir / "style_output" )
         options.priorities_path = str( assets_dir / "include" )
 
         try:
@@ -71,7 +71,8 @@ class MapCSSTest(unittest.TestCase):
             libkomwm.MULTIPROCESSING = True
 
             self.assertTrue(True, "Completed with no errors!")
-            # TODO: Check generated files content
+            # TODO: Check that types.txt contains 1173 lines
+            # TODO: Check that style_output.bin has 20 styles
         finally:
             # Clean up generated files
             files2delete = ["classificator.txt", "colors.txt", "patterns.txt", "style.bin.bin",

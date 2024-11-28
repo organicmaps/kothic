@@ -75,7 +75,6 @@ highway|path|horse;[highway=path][horse?];;name;int_name;317;
 highway|trunk|tunnel;[highway=trunk][tunnel?];;name;int_name;326;
 highway|steps|tunnel;[highway=steps][tunnel?],[highway=steps][location=underground];;name;int_name;327;
 highway|steps|bridge;[highway=steps][bridge?];;name;int_name;330;
-highway|track|tunnel;[highway=track][tunnel?];;name;int_name;331;
 highway|pedestrian|tunnel;[highway=pedestrian][tunnel?],[highway=pedestrian][location=underground];;name;int_name;332;
 highway|path|tunnel;[highway=path][tunnel?],[highway=path][location=underground];;name;int_name;336;
 deprecated:highway|path|alpine_hiking:04.2024;[highway=path][sac_scale=alpine_hiking];x;name;int_name;350;highway|path|expert
@@ -147,7 +146,3 @@ hwtag|nobicycle;1114;
 hwtag|yesbicycle;1115;
 hwtag|bidir_bicycle;1116;
 highway|services;1173;
-#hwtag|yescar;1150;
-#hwtag|nocar;1151;
-#hwtag|toll;1158;
-#hwtag|onedir_bicycle;1347;

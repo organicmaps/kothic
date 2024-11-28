@@ -6,7 +6,6 @@
 @import("include/colors.mapcss");
 @import("include/Roads.mapcss");
 @import("include/Roads_label.mapcss");
-@import("include/Icons.mapcss");
 
 colors
 {
