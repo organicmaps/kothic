@@ -5,7 +5,20 @@
 3.TRUNK & MOTORWAY 10-22 ZOOM
 4.PRIMARY 10-22 ZOOM
 5.SECONDARY 10-22 ZOOM
-6.ONEWAY ARROWS 15-22 ZOOM
+6.RESIDENTAL & TERTIARY 12-22 ZOOM
+7.ROAD, STREETS, UNCLASSIFIED & SERVICE 15-22 ZOOM
+8.OTHERS ROADS 15-22 ZOOM
+9.RAIL 15-22 ZOOM ????
+  9.1 Monorail 14-22 ZOOM
+  9.2 Tram line 13-22 ZOOM
+  9.3 Funicular 12-22 ZOOM
+10.PISTE 12-22 ZOOM ????
+ 10.1 Lift 12-22 ZOOM
+ 10.2 Aerialway 12-22 ZOOM
+ 10.3 Piste & Route 14-22 ZOOM
+11.FERRY 10-22 ZOOM
+12.ONEWAY ARROWS 15-22 ZOOM
+13.JUNCTION 15-22 ZOOM
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
@@ -171,7 +184,101 @@ line|z16-[highway=secondary],
 line|z16-[highway=secondary_link],
 {font-size: 12; text-color: @label_medium; text-halo-opacity: 1; text-halo-color: @label_halo_light;}
 
-/* 6. ONEWAY ARROWS  */
+/* 6.RESIDENTAL & TERTIARY 12-22 ZOOM */
+
+line|z12-[highway=tertiary],
+line|z13-[highway=unclassified],
+line|z13-[highway=residential],
+line|z14-[highway=road],
+line|z18-[highway=tertiary_link],
+{text: name; text-halo-radius: 1; text-halo-color: @label_halo_medium;}
+
+line|z12-13[highway=tertiary],
+line|z13[highway=unclassified],
+line|z13[highway=residential],
+{font-size: 10; text-color: @label_light; text-halo-opacity: 0.7;}
+line|z14-15[highway=tertiary],
+line|z14-15[highway=unclassified],
+line|z14-15[highway=residential],
+line|z14-15[highway=road],
+{font-size: 10; text-color: @label_medium; text-halo-opacity: 0.9;}
+line|z16-[highway=tertiary],
+line|z16-[highway=unclassified],
+line|z16-[highway=residential],
+line|z16-[highway=road],
+line|z18-[highway=tertiary_link],
+{font-size: 12; text-color: @label_medium; text-halo-opacity: 1; text-halo-color: @label_halo_light;}
+
+/* 7.STREETS & SERVICE 14-22 ZOOM */
+
+line|z14-[highway=living_street],
+line|z14-[highway=pedestrian],
+line|z16-[highway=service],
+line|z16-[highway=service][service=busway],
+line|z16-[highway=busway],
+{text: name; text-halo-radius: 1; text-halo-color: @label_halo_medium;}
+
+line|z14-15[highway=living_street],
+line|z14-15[highway=pedestrian],
+{font-size: 10; text-color: @label_light; text-halo-opacity: 0.9;}
+line|z16-17[highway=living_street],
+line|z16-17[highway=pedestrian],
+line|z16-17[highway=service],
+line|z16-17[highway=service][service=busway],
+line|z16-17[highway=busway],
+{font-size: 10; text-color: @label_medium; text-halo-opacity: 1; text-halo-color: @label_halo_light;}
+line|z18-[highway=living_street],
+line|z18-[highway=pedestrian],
+line|z18-[highway=service],
+line|z18-[highway=service][service=busway],
+line|z18-[highway=busway],
+{font-size: 12; text-color: @label_medium; text-halo-opacity: 1; text-halo-color: @label_halo_light;}
+
+/* 8.OTHERS ROADS 15-22 ZOOM */
+
+line|z15-[highway=cycleway],
+line|z15-[highway=construction],
+line|z15-[highway=track],
+line|z15-[highway=path],
+line|z15-[highway=bridleway],
+line|z15-[highway=footway],
+line|z16-[highway=steps],
+line|z16-[highway=ford],
+line|z16-[highway=raceway],
+{text: name;text-color: @label_medium;text-halo-opacity: 0.8;text-halo-radius: 1;text-halo-color: @label_halo_light;}
+
+/* Don't display names of sidewalks and pedestrian crossings. */
+line|z15-[highway=footway][footway=sidewalk],
+line|z15-[highway=footway][footway=crossing],
+{text: none;}
+
+line|z15[highway=construction],
+line|z15[highway=bridleway],
+line|z15[highway=path],
+line|z15[highway=footway],
+line|z15[highway=cycleway],
+line|z15[highway=track]
+{font-size: 8;}
+line|z16-17[highway=ford],
+line|z16-17[highway=cycleway],
+line|z16-17[highway=construction],
+line|z16-17[highway=track],
+line|z16-17[highway=raceway],
+line|z16-17[highway=path],
+line|z16-17[highway=bridleway],
+line|z16-17[highway=footway],
+{font-size: 9;}
+line|z18-[highway=ford],
+line|z18-[highway=cycleway],
+line|z18-[highway=construction],
+line|z18-[highway=track],
+line|z18-[highway=raceway],
+line|z18-[highway=path],
+line|z18-[highway=bridleway],
+line|z18-[highway=footway],
+{font-size: 10;}
+
+/* 12. ONEWAY ARROWS  */
 
 /* line|z15-[highway=primary][hwtag=oneway]::arrows <-- не работает по типам магистралей */
 
@@ -183,3 +290,13 @@ line|z17[hwtag=oneway]::arrows
 {pattern-offset: 70;pattern-image: arrow-s.svg;pattern-spacing: 80;}
 line|z18-[hwtag=oneway]::arrows
 {pattern-offset: 90;pattern-image: arrow-m.svg;pattern-spacing: 90;}
+
+/* 13.JUNCTION  */
+
+node|z15-[highway=motorway_junction],
+{text: name;text-color: @subway_label;text-position: center;}
+
+node|z15[highway=motorway_junction]
+{font-size: 9;}
+node|z16-[highway=motorway_junction],
+{font-size: 10;}
