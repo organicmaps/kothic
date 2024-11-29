@@ -260,9 +260,7 @@ class ConditionTest(unittest.TestCase):
         self.assertFalse(cond.test({"intermittent": "yes"}))
 
     def test_parser_true(self):
-        """ Test conditions in format [!some_tag?] It works the same way as [some_tag != yes]
-            Note that such conditions are not used by Organic Maps styles.
-        """
+        """ Test conditions in format [some_tag?] It works the same way as [some_tag = yes] """
         cond:Condition = parseCondition("area?")
         self.assertEqual(cond.type, "true")
         self.assertEqual(cond.params, ("area", ))
