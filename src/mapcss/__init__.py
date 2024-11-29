@@ -395,9 +395,9 @@ class MapCSS():
             raise Exception(msg)
 
         try:
+            # TODO: Drop support of z-index because `clamp` is always False and z-index properties unused in Organic Maps)
             if clamp:
                 "clamp z-indexes, so they're tightly following integers"
-                # TODO: Move following block to a separate method
                 zindex = set()
                 for chooser in self.choosers:
                     for stylez in chooser.styles:
