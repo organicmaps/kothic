@@ -514,7 +514,6 @@ def komap_mapswithme(options):
         if int(row[5]) < cnt:
             raise Exception('Wrong type id: {0}'.format(';'.join(row)))
         while int(row[5]) > cnt:
-            # TODO: Why do we have those lines in `types.txt`? What if remove print(...) statement?
             print("mapswithme", file=types_file)
             cnt += 1
         cnt += 1
@@ -544,7 +543,6 @@ def komap_mapswithme(options):
             if row[6]:
                 print(row[6], file=types_file)
             else:
-                # TODO: Why do we have those lines in `types.txt`? What if remove print(...) statement?
                 print("mapswithme", file=types_file)
         class_tree[cl] = row[0]
     class_order.sort()
