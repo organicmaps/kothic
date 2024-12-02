@@ -461,6 +461,7 @@ def komap_mapswithme(options):
         ddir = os.path.dirname(options.outfile)
 
     classificator = {}
+    tags_to_cl = {}
     class_order = []
     class_tree = {}
 
@@ -514,17 +515,26 @@ def komap_mapswithme(options):
             raise Exception('Duplicate type: {0}'.format(row[0]))
         pairs = [i.strip(']').split("=") for i in row[1].split(',')[0].split('[')]
         kv = OrderedDict()
+        match_tags = ''
         for i in pairs:
             if len(i) == 1:
                 if i[0]:
                     if i[0][0] == "!":
                         kv[i[0][1:].strip('?')] = "no"
+                        # Skip match_tags.
                     else:
                         kv[i[0].strip('?')] = "yes"
+                        match_tags += '[' + i[0] + ']'
             else:
                 kv[i[0]] = i[1]
+                match_tags += '[' + i[0] + '=' + i[1] + ']'
         if row[2] != "x":
             classificator[cl] = kv
+            if match_tags not in tags_to_cl:
+                tags_to_cl[match_tags] = cl
+            else:
+                print(f'WARNING: not unique match_tags: {match_tags}={cl}, previous ={tags_to_cl[match_tags]}')
+            #tags_to_cl[row[1].split(',')[0]] = cl
             class_order.append(cl)
             unique_types_check.add(cl)
             # Mark original type to distinguish it among replacing types.
@@ -538,6 +548,28 @@ def komap_mapswithme(options):
         class_tree[cl] = row[0]
     class_order.sort()
     types_file.close()
+
+    #pastk
+    #cl = 'leisure-track-area'
+    #print(cl, classificator[cl]) #OrderedDict([('leisure', 'track'), ('area', 'yes')])
+    #tags = '[leisure=track][area?]'
+    #print(tags, tags_to_cl[tags])
+    #tags = '[railway=rail][highspeed?]' #'[railway=rail][highspeed?][!service]'
+    #print(tags, tags_to_cl[tags])
+
+    # Manually-assisted conversions:
+    tags_to_cl['[place]'] = 'place'
+    tags_to_cl['[leisure]'] = 'leisure'
+    tags_to_cl['[waterway]'] = 'waterway'
+    tags_to_cl['[isoline]'] = 'isoline'
+    tags_to_cl['[sport]'] = 'sport'
+    tags_to_cl['[tourism]'] = 'tourism'
+    tags_to_cl['[craft]'] = 'craft'
+    tags_to_cl['[shop]'] = 'shop'
+    tags_to_cl['[highway]'] = 'highway'
+    tags_to_cl['[landuse=military][military=danger_area]'] = 'landuse-military-danger_area'
+    tags_to_cl['[railway=rail][bridge?]'] = 'railway-rail-bridge'
+    tags_to_cl['[railway=rail][tunnel?]'] = 'railway-rail-tunnel'
 
     output = ''
     for prio_range in prio_ranges.keys():
@@ -560,9 +592,8 @@ def komap_mapswithme(options):
     # Parse style mapcss
     global style
     style = MapCSS(options.minzoom, options.maxzoom)
-    style.parse(clamp=False, stretch=LAYER_PRIORITY_RANGE,
-                filename=options.filename, static_tags=mapcss_static_tags,
-                dynamic_tags=mapcss_dynamic_tags)
+    style.parse(filename=options.filename, static_tags=mapcss_static_tags,
+                dynamic_tags=mapcss_dynamic_tags, rewrite = True, tags_to_cl = tags_to_cl)
 
     # Build optimization tree - class/zoom/type -> StyleChoosers
     clname_cltag_unique = set()
