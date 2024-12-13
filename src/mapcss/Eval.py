@@ -15,6 +15,10 @@
 #   You should have received a copy of the GNU General Public License
 #   along with kothic.  If not, see <http://www.gnu.org/licenses/>.
 
+import logging
+
+logger = logging.getLogger('mapcss.Eval')
+logger.setLevel(logging.ERROR)
 
 class Eval():
     def __init__(self, s='eval()'):
@@ -57,6 +61,8 @@ class Eval():
                  "any": fake_compute,
                  "min": fake_compute,
                  "max": fake_compute,
+                 "cond": fake_compute,
+                 "boolean": fake_compute,
                  })
         return tags
 
@@ -99,12 +105,15 @@ class Eval():
                 return "{:.4g}".format(result)
 
             return str(result)
-        except:
+        except Exception as e:
+            logger.warning(f"Error evaluating expression `{self.expr_text}`", e)
             return ""
 
     def __repr__(self):
         return "eval(%s)" % self.expr_text
 
+    def __eq__(self, other):
+        return type(self) == type(other) and self.expr_text == other.expr_text
 
 def m_boolean(expr):
     expr = str(expr)
