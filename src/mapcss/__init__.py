@@ -25,6 +25,7 @@ from .Condition import Condition
 NEEDED_KEYS = set(["width", "casing-width", "casing-width-add", "fill-color", "fill-image", "icon-image", "text", "extrude",
                    "background-image", "background-color", "pattern-image", "shield-color", "symbol-shape"])
 
+# TODO: Unused constant
 WHITESPACE = re.compile(r'\s+ ', re.S | re.X)
 
 COMMENT = re.compile(r'\/\* .*? \*\/ \s* ', re.S | re.X)
@@ -40,29 +41,30 @@ VARIABLE_SET = re.compile(r'@([a-z][\w\d]*) \s* : \s* (.+?) \s* ; \s* ', re.S | 
 UNKNOWN = re.compile(r'(\S+) \s* ', re.S | re.X)
 
 ZOOM_MINMAX = re.compile(r'(\d+)\-(\d+) $', re.S | re.X)
-ZOOM_MIN = re.compile(r'(\d+)\-      $', re.S | re.X)
-ZOOM_MAX = re.compile(r'     \-(\d+) $', re.S | re.X)
+ZOOM_MIN    = re.compile(r'(\d+)\-      $', re.S | re.X)
+ZOOM_MAX    = re.compile(r'     \-(\d+) $', re.S | re.X)
 ZOOM_SINGLE = re.compile(r'       (\d+) $', re.S | re.X)
 
-CONDITION_TRUE = re.compile(r'\s* ([:\w]+) \s* [?] \s*  $', re.I | re.S | re.X)
+# TODO: move to Condition.py
+CONDITION_TRUE    = re.compile(r'\s* ([:\w]+) \s* [?] \s*  $', re.I | re.S | re.X)
 CONDITION_invTRUE = re.compile(r'\s* [!] \s* ([:\w]+) \s* [?] \s*  $', re.I | re.S | re.X)
-CONDITION_FALSE = re.compile(r'\s* ([:\w]+) \s* = \s* no  \s*  $', re.I | re.S | re.X)
-CONDITION_SET = re.compile(r'\s* ([-:\w]+) \s* $', re.S | re.X)
-CONDITION_UNSET = re.compile(r'\s* !([:\w]+) \s* $', re.S | re.X)
-CONDITION_EQ = re.compile(r'\s* ([:\w]+) \s* =  \s* (.+) \s* $', re.S | re.X)
-CONDITION_NE = re.compile(r'\s* ([:\w]+) \s* != \s* (.+) \s* $', re.S | re.X)
-CONDITION_GT = re.compile(r'\s* ([:\w]+) \s* >  \s* (.+) \s* $', re.S | re.X)
-CONDITION_GE = re.compile(r'\s* ([:\w]+) \s* >= \s* (.+) \s* $', re.S | re.X)
-CONDITION_LT = re.compile(r'\s* ([:\w]+) \s* <  \s* (.+) \s* $', re.S | re.X)
-CONDITION_LE = re.compile(r'\s* ([:\w]+) \s* <= \s* (.+) \s* $', re.S | re.X)
-CONDITION_REGEX = re.compile(r'\s* ([:\w]+) \s* =~\/ \s* (.+) \/ \s* $', re.S | re.X)
+CONDITION_FALSE   = re.compile(r'\s* ([:\w]+) \s* = \s* no  \s*  $', re.I | re.S | re.X)
+CONDITION_SET     = re.compile(r'\s* ([-:\w]+) \s* $', re.S | re.X)
+CONDITION_UNSET   = re.compile(r'\s* !([:\w]+) \s* $', re.S | re.X)
+CONDITION_EQ      = re.compile(r'\s* ([:\w]+) \s* =  \s* (.+) \s* $', re.S | re.X)
+CONDITION_NE      = re.compile(r'\s* ([:\w]+) \s* != \s* (.+) \s* $', re.S | re.X)
+CONDITION_GT      = re.compile(r'\s* ([:\w]+) \s* >  \s* (.+) \s* $', re.S | re.X)
+CONDITION_GE      = re.compile(r'\s* ([:\w]+) \s* >= \s* (.+) \s* $', re.S | re.X)
+CONDITION_LT      = re.compile(r'\s* ([:\w]+) \s* <  \s* (.+) \s* $', re.S | re.X)
+CONDITION_LE      = re.compile(r'\s* ([:\w]+) \s* <= \s* (.+) \s* $', re.S | re.X)
+CONDITION_REGEX   = re.compile(r'\s* ([:\w]+) \s* =~\/ \s* (.+) \/ \s* $', re.S | re.X)
 
 ASSIGNMENT_EVAL = re.compile(r"\s* (\S+) \s* \:      \s* eval \s* \( \s* ' (.+?) ' \s* \) \s* $", re.I | re.S | re.X)
-ASSIGNMENT = re.compile(r'\s* (\S+) \s* \:      \s*          (.+?) \s*                   $', re.S | re.X)
-SET_TAG_EVAL = re.compile(r"\s* set \s+(\S+)\s* = \s* eval \s* \( \s* ' (.+?) ' \s* \) \s* $", re.I | re.S | re.X)
-SET_TAG = re.compile(r'\s* set \s+(\S+)\s* = \s*          (.+?) \s*                   $', re.I | re.S | re.X)
-SET_TAG_TRUE = re.compile(r'\s* set \s+(\S+)\s* $', re.I | re.S | re.X)
-EXIT = re.compile(r'\s* exit \s* $', re.I | re.S | re.X)
+ASSIGNMENT      = re.compile(r'\s* (\S+) \s* \:      \s*          (.+?) \s*                   $', re.S | re.X)
+SET_TAG_EVAL    = re.compile(r"\s* set \s+(\S+)\s* = \s* eval \s* \( \s* ' (.+?) ' \s* \) \s* $", re.I | re.S | re.X)
+SET_TAG         = re.compile(r'\s* set \s+(\S+)\s* = \s*          (.+?) \s*                   $', re.I | re.S | re.X)
+SET_TAG_TRUE    = re.compile(r'\s* set \s+(\S+)\s* $', re.I | re.S | re.X)
+EXIT            = re.compile(r'\s* exit \s* $', re.I | re.S | re.X)
 
 oNONE = 0
 oZOOM = 2
@@ -73,6 +75,7 @@ oDECLARATION = 6
 oSUBPART = 7
 oVARIABLE_SET = 8
 
+# TODO: Following block of variables is never used
 DASH = re.compile(r'\-/g')
 COLOR = re.compile(r'color$/')
 BOLD = re.compile(r'^bold$/i')
@@ -81,6 +84,7 @@ UNDERLINE = re.compile(r'^underline$/i')
 CAPS = re.compile(r'^uppercase$/i')
 CENTER = re.compile(r'^center$/i')
 
+# TODO: Remove unused HEX variable
 HEX = re.compile(r'^#([0-9a-f]+)$/i')
 VARIABLE = re.compile(r'@([a-z][\w\d]*)')
 
@@ -98,6 +102,7 @@ class MapCSS():
         self.choosers_by_type = {}
         self.choosers_by_type_zoom_tag = {}
         self.variables = {}
+        self.unused_variables = set()
         self.style_loaded = False
 
     def parseZoom(self, s):
@@ -110,6 +115,7 @@ class MapCSS():
         elif ZOOM_SINGLE.match(s):
             return float(ZOOM_SINGLE.match(s).groups()[0]), float(ZOOM_SINGLE.match(s).groups()[0])
         else:
+            # TODO: Should we raise an exception here?
             logging.error("unparsed zoom: %s" % s)
 
     def build_choosers_tree(self, clname, type, cltag):
@@ -163,6 +169,8 @@ class MapCSS():
                     runtime_rules.append(runtime_conditions)
         return runtime_rules
 
+    # TODO: Renamed to `get_styles` because it returns a list of styles for each class `::XXX`
+    # Refactoring idea: Maybe return dict with `object-id` as a key
     def get_style(self, clname, type, tags, zoom, xscale, zscale, filter_by_runtime_conditions):
         style = []
         if type in self.choosers_by_type_zoom_tag:
@@ -207,6 +215,8 @@ class MapCSS():
 
     def get_variable(self, m):
         name = m.group()[1:]
+        if name in self.unused_variables:
+            self.unused_variables.remove(name)
         if not name in self.variables:
             raise Exception("Variable not found: " + str(format(name)))
         return self.variables[name] if name in self.variables else m.group()
@@ -219,7 +229,8 @@ class MapCSS():
         if filename:
             basepath = os.path.dirname(filename)
         if not css:
-            css = open(filename).read()
+            with open(filename) as css_file:
+                css = css_file.read()
         if not self.style_loaded:
             self.choosers = []
 
@@ -339,7 +350,8 @@ class MapCSS():
                         import_filename = os.path.join(basepath, IMPORT.match(css).groups()[0])
                         try:
                             css = IMPORT.sub("", css, 1)
-                            import_text = open(import_filename, "r").read()
+                            with open(import_filename, "r") as import_file:
+                                import_text = import_file.read()
                             stck[-1][1] = css # store remained part
                             stck.append([import_filename, import_text, import_text])
                             wasBroken = True
@@ -352,6 +364,7 @@ class MapCSS():
                         name = VARIABLE_SET.match(css).groups()[0]
                         log.debug("variable set found: %s" % name)
                         self.variables[name] = VARIABLE_SET.match(css).groups()[1]
+                        self.unused_variables.add( name )
                         css = VARIABLE_SET.sub("", css, 1)
                         previous = oVARIABLE_SET
 
@@ -359,7 +372,7 @@ class MapCSS():
                     elif UNKNOWN.match(css):
                         raise Exception("Unknown construction: " + UNKNOWN.match(css).group())
 
-                    # Must be unreacheable
+                    # Must be unreachable
                     else:
                         raise Exception("Unexpected construction: " + css)
 
@@ -377,10 +390,13 @@ class MapCSS():
             css_orig = stck[-1][2] # original
             css = stck[-1][1] # remained
             line = css_orig[:-len(css)].count("\n") + 1
+            # TODO: Handle filename is None
             msg = str(e) + "\nFile: " + filename + "\nLine: " + str(line)
+            # TODO: Print stack trace of original exception `e`
             raise Exception(msg)
 
         try:
+            # TODO: Drop support of z-index because `clamp` is always False and z-index properties unused in Organic Maps)
             if clamp:
                 "clamp z-indexes, so they're tightly following integers"
                 zindex = set()
@@ -398,8 +414,10 @@ class MapCSS():
                             else:
                                 stylez['z-index'] = res
         except TypeError:
+            # TODO: Better error handling here
             pass
 
+        # Group MapCSS styles by object type: 'area', 'line', 'way', 'node'
         for chooser in self.choosers:
             for t in chooser.compatible_types:
                 if t not in self.choosers_by_type:
@@ -407,7 +425,11 @@ class MapCSS():
                 else:
                     self.choosers_by_type[t].append(chooser)
 
+        if self.unused_variables:
+            # TODO: Do not print warning here. Instead let libkomwn.komap_mapswithme(...) analyze unused_variables
+            print(f"Warning: Unused variables: {', '.join(self.unused_variables)}")
 
+# TODO: move to Condition.py
 def parseCondition(s):
     log = logging.getLogger('mapcss.parser.condition')
 
@@ -488,7 +510,7 @@ def parseDeclaration(s):
             logging.debug("%s == %s" % (tzz[0], tzz[1]))
         else:
             logging.debug("unknown %s" % (a))
-    return [t]
+    return [t] # TODO: don't wrap `t` dict into a list. Return `t` instead.
 
 
 if __name__ == "__main__":
