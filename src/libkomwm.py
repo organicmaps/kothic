@@ -267,6 +267,38 @@ def load_priorities(prio_range, path, classif, compress = False):
             idx = unique_prios.index(prio_ranges[prio_range]['priorities'][prio_id])
             prio_ranges[prio_range]['priorities'][prio_id] = int(step * (base_idx + idx))
 
+def load_colors(file_path:str) -> set[int]:
+    colors = set()
+    if os.path.exists(file_path):
+        with open(file_path, "rt") as colors_in_file:
+            for colorLine in colors_in_file:
+                if colorLine.strip():
+                    colors.add(int(colorLine.strip()))
+    return colors
+
+def save_colors(colors:set[int], file_path:str):
+    with open(file_path, "wt") as colors_file:
+        for c in sorted(colors):
+            colors_file.write("%d\n" % c)
+
+def addPattern(patterns:list[list[float]], dashes: list[float]):
+    if dashes and dashes not in patterns:
+        patterns.append(dashes)
+
+def load_patterns(patterns_file_name:str) -> list[list[float]]:
+    patterns = []
+
+    if os.path.exists(patterns_file_name):
+        with open(patterns_file_name, "rt") as patterns_in_file:
+            for patternsLine in patterns_in_file:
+                addPattern(patterns, [float(x) for x in patternsLine.split()])
+    return patterns
+
+def save_patterns(patterns: list[list[float]], patterns_file_name: str):
+    with open(patterns_file_name, "wt") as patterns_file:
+        for p in patterns:
+            patterns_file.write("%s\n" % (' '.join(str(elem) for elem in p)))
+
 
 def store_visibility(cl, dr_type, object_id, zoom, auto_comment = None):
     if object_id == '::default':
@@ -469,27 +501,11 @@ def komap_mapswithme(options):
     class_order = []
     class_tree = {}
 
-    # TODO: Introduce new function to parse `colors.txt` for better testability
     colors_file_name = os.path.join(ddir, 'colors.txt')
-    colors = set()
-    if os.path.exists(colors_file_name):
-        colors_in_file = open(colors_file_name, "r")
-        for colorLine in colors_in_file:
-            colors.add(int(colorLine))
-        colors_in_file.close()
-
-    # TODO: Introduce new function to parse `patterns.txt` for better testability
-    patterns = []
-    def addPattern(dashes):
-        if dashes and dashes not in patterns:
-            patterns.append(dashes)
+    colors:set[int] = load_colors(colors_file_name)
 
     patterns_file_name = os.path.join(ddir, 'patterns.txt')
-    if os.path.exists(patterns_file_name):
-        patterns_in_file = open(patterns_file_name, "r")
-        for patternsLine in patterns_in_file:
-            addPattern([float(x) for x in patternsLine.split()])
-        patterns_in_file.close()
+    patterns:list[list[float]] = load_patterns(patterns_file_name)
 
     # Build classificator tree from mapcss-mapping.csv file
     types_file = open(os.path.join(ddir, 'types.txt'), "w")
@@ -736,7 +752,7 @@ def komap_mapswithme(options):
                                 store_visibility(cl, 'line', st.get('object-id'), zoom)
                             for i in st.get('casing-dashes', st.get('dashes', [])):
                                 dr_line.dashdot.dd.extend([float(i)])
-                            addPattern(dr_line.dashdot.dd)
+                            addPattern(patterns, dr_line.dashdot.dd)
                             dr_line.cap = dr_linecaps.get(st.get('casing-linecap', 'butt'), BUTTCAP)
                             dr_line.join = dr_linejoins.get(st.get('casing-linejoin', 'round'), ROUNDJOIN)
                             dr_element.lines.extend([dr_line])
@@ -764,7 +780,7 @@ def komap_mapswithme(options):
                             dr_line.color = mwm_encode_color(colors, st)
                             for i in st.get('dashes', []):
                                 dr_line.dashdot.dd.extend([float(i)])
-                            addPattern(dr_line.dashdot.dd)
+                            addPattern(patterns, dr_line.dashdot.dd)
                             dr_line.cap = dr_linecaps.get(st.get('linecap', 'butt'), BUTTCAP)
                             dr_line.join = dr_linejoins.get(st.get('linejoin', 'round'), ROUNDJOIN)
                             dr_line.priority = get_drape_priority(cl, 'line', st.get('object-id'))
@@ -957,17 +973,11 @@ def komap_mapswithme(options):
     visibility_file.close()
     classificator_file.close()
 
-    # TODO: Introduce new function to dump `colors.txt` for better testability
-    colors_file = open(colors_file_name, "w")
-    for c in sorted(colors):
-        colors_file.write("%d\n" % (c))
-    colors_file.close()
+    # Save sorted colors
+    save_colors(colors, colors_file_name)
 
-    # TODO: Introduce new function to dump `patterns.txt` for better testability
-    patterns_file = open(patterns_file_name, "w")
-    for p in patterns:
-        patterns_file.write("%s\n" % (' '.join(str(elem) for elem in p)))
-    patterns_file.close()
+    # Save patterns with no duplicates
+    save_patterns(patterns, patterns_file_name)
 
 
 def main():
