@@ -300,7 +300,7 @@ def save_patterns(patterns: list[list[float]], patterns_file_name: str):
             patterns_file.write("%s\n" % (' '.join(str(elem) for elem in p)))
 
 def load_mapcss_mapping(filename:str):
-    classificator = {}
+    classificator:dict[str, OrderedDict] = {}
     class_tree:dict[str, str] = {}
     class_order:list[str] = []
     types:list[str] = []
@@ -323,7 +323,7 @@ def load_mapcss_mapping(filename:str):
             if int(row[5]) < cnt:
                 raise Exception('Wrong type id: {0}'.format(';'.join(row)))
             while int(row[5]) > cnt:
-                types.append("mapswithme") # Placeholder
+                types.append("mapswithme")  # Placeholder
                 cnt += 1
             cnt += 1
 
@@ -352,7 +352,7 @@ def load_mapcss_mapping(filename:str):
                 if row[6]:
                     types.append(row[6])
                 else:
-                    types.append("mapswithme")
+                    types.append("mapswithme")  # Placeholder
             class_tree[cl] = row[0]
 
     class_order.sort()
