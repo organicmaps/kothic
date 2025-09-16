@@ -330,6 +330,9 @@ def load_mapcss_mapping(filename:str):
             cl = row[0].replace("|", "-")
             if cl in unique_types_check and row[2] != 'x':
                 raise Exception('Duplicate type: {0}'.format(row[0]))
+            # TODO: row[1] contains multiple tag=value combinations comma-separated.
+            #  E.g. "[leisure=swimming_pool][access=private],[amenity=swimming_pool][access=private]"
+            #  But only the first one "[leisure=swimming_pool][access=private]" is parsed here.
             pairs = [i.strip(']').split("=") for i in row[1].split(',')[0].split('[')]
             kv = OrderedDict()
             for i in pairs:
