@@ -4,11 +4,10 @@ import os
 import csv
 import functools
 from sys import exit
-from itertools import chain
 from multiprocessing import Pool, set_start_method
 from collections import OrderedDict
 import mapcss.webcolors
-from drules_struct_pb2 import *
+from drules_struct_pb2 import BUTTCAP, ROUNDCAP, NOJOIN, BEVELJOIN, ROUNDJOIN, ContainerProto, ColorElementProto, ClassifElementProto, DrawElementProto, LineRuleProto
 
 whatever_to_hex = mapcss.webcolors.webcolors.whatever_to_hex
 whatever_to_cairo = mapcss.webcolors.webcolors.whatever_to_cairo
@@ -235,7 +234,7 @@ def load_priorities(prio_range, path, classif, compress = False):
 
         if len(group):
             line = group
-            print_warning(f'skipping last types groups with no priority set')
+            print_warning('skipping last types groups with no priority set')
 
     if prio_range == PRIO_OVERLAYS:
         for key in prio_ranges[PRIO_OVERLAYS]['priorities'].keys():
@@ -632,6 +631,7 @@ def komap_mapswithme(options):
 
     # TODO: refactor next for-loop for readability and testability
     global validation_errors_count
+    visstring = None
     for results in imapfunc(query_style, ((cl, classificator[cl], options.minzoom, options.maxzoom) for cl in class_order)):
         for result in results:
                 cl, zoom, runtime_conditions, zstyle = result
@@ -663,7 +663,6 @@ def komap_mapswithme(options):
                 if dr_cont is None:
                     dr_cont = ClassifElementProto()
                     dr_cont.name = cl
-                    dr_lines_objects = {}
 
                     visstring = ["0"] * (options.maxzoom - options.minzoom + 1)
 
@@ -685,7 +684,7 @@ def komap_mapswithme(options):
                 has_text = None
                 txfmt = []
                 for st in zstyle:
-                    if st.get('text') and st.get('text') != 'none' and not st.get('text') in txfmt:
+                    if st.get('text') and st.get('text') != 'none' and st.get('text') not in txfmt:
                         txfmt.append(st.get('text'))
                         if has_text is None:
                             has_text = []

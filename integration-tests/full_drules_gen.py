@@ -44,7 +44,7 @@ def full_styles_regenerate(options):
 
         # Run generation
         libkomwm.komap_mapswithme(options)
-    log.info(f"Done!")
+    log.info("Done!")
 
 def main():
     parser = OptionParser()
