@@ -17,12 +17,12 @@ log = logging.getLogger('test_drules_gen')
 log.setLevel(logging.INFO)
 
 styles = {
-    'default_light':  ['styles/default/light/style.mapcss',  'styles/default/include'],
-    'default_dark':   ['styles/default/dark/style.mapcss',   'styles/default/include'],
-    'outdoors_light': ['styles/outdoors/light/style.mapcss', 'styles/outdoors/include'],
-    'outdoors_dark':  ['styles/outdoors/dark/style.mapcss',  'styles/outdoors/include'],
-    'vehicle_light':  ['styles/vehicle/light/style.mapcss',  'styles/vehicle/include'],
-    'vehicle_dark':   ['styles/vehicle/dark/style.mapcss',   'styles/vehicle/include'],
+    'drules_proto_default_light':  ['styles/default/light/style.mapcss',  'styles/default/include'],
+    'drules_proto_default_dark':   ['styles/default/dark/style.mapcss',   'styles/default/include'],
+    'drules_proto_outdoors_light': ['styles/outdoors/light/style.mapcss', 'styles/outdoors/include'],
+    'drules_proto_outdoors_dark':  ['styles/outdoors/dark/style.mapcss',  'styles/outdoors/include'],
+    'drules_proto_vehicle_light':  ['styles/vehicle/light/style.mapcss',  'styles/vehicle/include'],
+    'drules_proto_vehicle_dark':   ['styles/vehicle/dark/style.mapcss',   'styles/vehicle/include'],
 }
 
 
@@ -44,7 +44,28 @@ def full_styles_regenerate(options):
 
         # Run generation
         libkomwm.komap_mapswithme(options)
-    log.info("Done!")
+
+def compare_with_main_repo(generated_dir, data_dir):
+    has_any_diff = False
+    for style_name in styles:
+        match = compare_content(f"{generated_dir}/{style_name}.bin", f"{data_dir}/{style_name}.bin", binary=True)
+        if not match:
+            log.warning(f"File {style_name}.bin doesn't match")
+            has_any_diff = True
+        match = compare_content(f"{generated_dir}/{style_name}.txt", f"{data_dir}/{style_name}.txt", binary=False)
+        if not match:
+            log.warning(f"File {style_name}.txt doesn't match")
+            has_any_diff = True
+
+    if not has_any_diff:
+        log.info("All generated files match")
+
+def compare_content(file_a_path: str, file_b_path:str, binary=True) -> bool:
+    mode = "rb" if binary else "rt"
+    with open(file_a_path, mode) as file_a_obj, open(file_b_path, mode) as file_b_obj:
+        file_a_content = file_a_obj.read()
+        file_b_content = file_b_obj.read()
+        return file_a_content == file_b_content
 
 def main():
     parser = OptionParser()
@@ -68,6 +89,8 @@ def main():
         parser.error("Please specify base output path.")
 
     full_styles_regenerate(options)
+    compare_with_main_repo(options.outdir, options.data)
+    log.info("Done!")
 
 if __name__ == '__main__':
     main()
