@@ -323,7 +323,7 @@ def load_mapcss_mapping(filename:str):
             if int(row[5]) < cnt:
                 raise Exception('Wrong type id: {0}'.format(';'.join(row)))
             while int(row[5]) > cnt:
-                types.append("mapswithme")  # Placeholder
+                types.append("organicmaps")  # Placeholder
                 cnt += 1
             cnt += 1
 
@@ -355,7 +355,7 @@ def load_mapcss_mapping(filename:str):
                 if row[6]:
                     types.append(row[6])
                 else:
-                    types.append("mapswithme")  # Placeholder
+                    types.append("organicmaps")  # Placeholder
             class_tree[cl] = row[0]
 
     class_order.sort()
