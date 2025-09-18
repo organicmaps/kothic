@@ -270,14 +270,14 @@ def load_priorities(prio_range:str, path:str, classif:set[str], compress:bool = 
 def load_colors(file_path:str) -> set[int]:
     colors = set()
     if os.path.exists(file_path):
-        with open(file_path, "rt") as colors_in_file:
+        with open(file_path, "r") as colors_in_file:
             for colorLine in colors_in_file:
                 if colorLine.strip():
                     colors.add(int(colorLine.strip()))
     return colors
 
 def save_colors(colors:set[int], file_path:str):
-    with open(file_path, "wt") as colors_file:
+    with open(file_path, "w") as colors_file:
         for c in sorted(colors):
             colors_file.write("%d\n" % c)
 
@@ -289,13 +289,13 @@ def load_patterns(patterns_file_name:str) -> list[list[float]]:
     patterns = []
 
     if os.path.exists(patterns_file_name):
-        with open(patterns_file_name, "rt") as patterns_in_file:
+        with open(patterns_file_name, "r") as patterns_in_file:
             for patternsLine in patterns_in_file:
                 addPattern(patterns, [float(x) for x in patternsLine.split()])
     return patterns
 
 def save_patterns(patterns: list[list[float]], patterns_file_name: str):
-    with open(patterns_file_name, "wt") as patterns_file:
+    with open(patterns_file_name, "w") as patterns_file:
         for p in patterns:
             patterns_file.write("%s\n" % (' '.join(str(elem) for elem in p)))
 
@@ -307,7 +307,7 @@ def load_mapcss_mapping(filename:str):
 
     cnt = 1
     unique_types_check = set()
-    with open(filename, "rt") as mapping_file:
+    with open(filename, "r") as mapping_file:
         for row in csv.reader(mapping_file, delimiter=';'):
             if len(row) <= 1 or row[0].startswith('#'):
                 # Allow for empty lines and comment lines starting with '#'.
@@ -362,7 +362,7 @@ def load_mapcss_mapping(filename:str):
     return classificator, class_tree, class_order, types
 
 def save_types(types:list[str], types_filename:str):
-    with open(types_filename, "wt") as types_file:
+    with open(types_filename, "w") as types_file:
         for tp in types:
             types_file.write(tp + "\n")
 

@@ -41,7 +41,7 @@ class LibKomwmTest(unittest.TestCase):
             libkomwm.visibilities = {}
 
             # Check that types.txt contains 1173 lines
-            with open(assets_dir / "types.txt", "rt") as typesFile:
+            with open(assets_dir / "types.txt", "r") as typesFile:
                 lines = [line.strip() for line in typesFile]
                 self.assertEqual(len(lines), 1173, "Generated types.txt file should contain 1173 lines")
                 self.assertEqual(len([line for line in lines if line!="organicmaps"]), 148, "Actual types count should be 148 as in mapcss-mapping.csv")
