@@ -470,7 +470,7 @@ def komap_mapswithme(options):
     class_tree = {}
 
     # TODO: Introduce new function to parse `colors.txt` for better testability
-    colors_file_name = os.path.join(ddir, 'colors.txt')
+    colors_file_name = options.outfile_colors if options.outfile_colors else os.path.join(ddir, 'colors.txt')
     colors = set()
     if os.path.exists(colors_file_name):
         colors_in_file = open(colors_file_name, "r")
@@ -484,7 +484,7 @@ def komap_mapswithme(options):
         if dashes and dashes not in patterns:
             patterns.append(dashes)
 
-    patterns_file_name = os.path.join(ddir, 'patterns.txt')
+    patterns_file_name = options.outfile_patterns if options.outfile_patterns else os.path.join(ddir, 'patterns.txt')
     if os.path.exists(patterns_file_name):
         patterns_in_file = open(patterns_file_name, "r")
         for patternsLine in patterns_in_file:
@@ -906,14 +906,14 @@ def komap_mapswithme(options):
 
     # Write drules_proto.bin and drules_proto.txt files
 
-    drules_bin = open(os.path.join(options.outfile + '.bin'), "wb")
+    drules_bin = open(os.path.join(options.outfile), "wb")
     drules_bin.write(drules.SerializeToString())
     drules_bin.close()
 
-    if options.txt:
-        drules_txt = open(os.path.join(options.outfile + '.txt'), "wb")
-        drules_txt.write(str(drules).encode())
-        drules_txt.close()
+    if options.outfile_dump:
+        drules_dump = open(os.path.join(options.outfile_dump), "wb")
+        drules_dump.write(str(drules).encode())
+        drules_dump.close()
 
     # Write classificator.txt and visibility.txt files
 
@@ -980,8 +980,12 @@ def main():
                       help="maximal available zoom level", metavar="ZOOM")
     parser.add_option("-o", "--output-file", dest="outfile", default="-",
                       help="output filename", metavar="FILE")
-    parser.add_option("-x", "--txt", dest="txt", action="store_true",
-                      help="create a text file for output", default=False)
+    parser.add_option("--output-file-dump", dest="outfile_dump", default=None,
+                      help="path for output file dump", metavar="FILE")
+    parser.add_option("--output-file-colors", dest="outfile_colors", default=None,
+                      help="path for output colors file", metavar="FILE")
+    parser.add_option("--output-file-patterns", dest="outfile_patterns", default=None,
+                      help="path for output patterns file", metavar="FILE")
     parser.add_option("-p", "--priorities-path", dest="priorities_path",
                       help="path to priorities *.prio.txt files", metavar="PATH")
     parser.add_option("-d", "--data-path", dest="data",
