@@ -28,22 +28,16 @@ styles = {
 
 def full_styles_regenerate(options):
     log.info("Start generating styles")
-    libkomwm.MULTIPROCESSING = False
-    prio_ranges_orig = deepcopy(libkomwm.prio_ranges)
 
     for name, (style_path, include_path) in styles.items():
         log.info(f"Generating {name} style ...")
-
-        # Restore initial state
-        libkomwm.prio_ranges = deepcopy(prio_ranges_orig)
-        libkomwm.visibilities = {}
 
         options.filename = options.data + '/' + style_path
         options.priorities_path = options.data + '/' + include_path
         options.outfile = options.outdir + '/' + name
 
         # Run generation
-        libkomwm.komap_mapswithme(options)
+        libkomwm.main(options)
     log.info("Done!")
 
 def main():

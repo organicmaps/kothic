@@ -1,13 +1,12 @@
 import unittest
 import sys
 from pathlib import Path
-from copy import deepcopy
 
 # Add `src` directory to the import paths
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 import libkomwm
-from libkomwm import komap_mapswithme
+from drules_struct_pb2 import ContainerProto
 
 
 class LibKomwmTest(unittest.TestCase):
@@ -27,18 +26,8 @@ class LibKomwmTest(unittest.TestCase):
         options.priorities_path = str( assets_dir / "include" )
 
         try:
-            # Save state
-            libkomwm.MULTIPROCESSING = False
-            prio_ranges_orig = deepcopy(libkomwm.prio_ranges)
-            libkomwm.visibilities = {}
-
             # Run style generation
-            komap_mapswithme(options)
-
-            # Restore state
-            libkomwm.prio_ranges = prio_ranges_orig
-            libkomwm.MULTIPROCESSING = True
-            libkomwm.visibilities = {}
+            libkomwm.main(options)
 
             # Check that types.txt contains 1173 lines
             with open(assets_dir / "types.txt", "rt") as typesFile:
@@ -49,7 +38,7 @@ class LibKomwmTest(unittest.TestCase):
             # Check that style_output.bin has 20 styles
             with open(assets_dir / "style_output.bin", "rb") as protobuf_file:
                 protobuf_data = protobuf_file.read()
-            drules = libkomwm.ContainerProto()
+            drules = ContainerProto()
             drules.ParseFromString(protobuf_data)
 
             self.assertEqual(len(drules.cont), 20, "Generated style_output.bin should contain 20 styles")
