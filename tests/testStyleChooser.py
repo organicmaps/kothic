@@ -5,6 +5,7 @@ from pathlib import Path
 # Add `src` directory to the import paths
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
+from mapcss.Rule import Rule
 from mapcss import parseCondition, Condition
 from mapcss.Eval import Eval
 from mapcss.StyleChooser import StyleChooser, make_nice_style

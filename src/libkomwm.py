@@ -1,598 +1,166 @@
+import json
+import logging
+from typing import List, Dict, Set, Optional, Callable, NamedTuple, Union
 from mapcss import MapCSS
-from optparse import OptionParser
+from optparse import OptionParser, Values
 import os
-import csv
-import functools
 from sys import exit
 from multiprocessing import Pool, set_start_method
-from collections import OrderedDict
-import mapcss.webcolors
-from drules_struct_pb2 import BUTTCAP, ROUNDCAP, NOJOIN, BEVELJOIN, ROUNDJOIN, ContainerProto, ColorElementProto, ClassifElementProto, DrawElementProto, LineRuleProto
 
-whatever_to_hex = mapcss.webcolors.webcolors.whatever_to_hex
-whatever_to_cairo = mapcss.webcolors.webcolors.whatever_to_cairo
+from drules_config import get_prio_ranges, LAYER_PRIORITY_RANGE
+from drules_utils import mwm_encode_color
+from drules_priority import PriorityManager
+from drules_classificator import ClassificatorManager, load_mapcss_dynamic_tags
+from drules_fileio import FileIOManager
+from drules_visibility import VisibilityTracker
+from drules_style_processor import StyleProcessor
+from drules_serializer import DrulesSerializer
 
-PROFILE = False
-MULTIPROCESSING = True
+# Configure module logger
+logger = logging.getLogger(__name__)
 
-# Priority values defined in *.prio.txt files are adjusted
-# to fit into the following "priorities ranges":
-# [-10000; 10000): overlays (icons, captions...)
-# [0; 1000)      : FG - foreground areas and lines
-# [-1000; 0)     : BG-top - water, linear and areal, rendered just on top of landcover
-# (-2000; -1000) : BG-by-size - landcover areas, later in core sorted by their bbox size
-# The core renderer then re-adjusts those ranges as necessary to accomodate
-# for special behavior and features' layer=* values.
-# See drape_frontend/stylist.cpp for the details of layering logic.
+# =============================================================================
+# CONSTANTS
+# =============================================================================
 
-# Priority range for area and line drules. Should be same as drule::kLayerPriorityRange.
-LAYER_PRIORITY_RANGE = 1000
-# Should be same as drule::kOverlaysMaxPriority. The overlays range is [-kOverlaysMaxPriority; kOverlaysMaxPriority),
-# negative values are used for optional captions which are below most other overlays.
-OVERLAYS_MAX_PRIORITY = 10000
-
-# Drules are arranged into following ranges.
-PRIO_OVERLAYS = 'overlays'
-PRIO_FG = 'FG'
-PRIO_BG_TOP = 'BG-top'
-PRIO_BG_BY_SIZE = 'BG-by-size'
-
-prio_ranges = {
-    PRIO_OVERLAYS: {'pos': 4, 'base': 0, 'priorities': {}},
-    PRIO_FG: {'pos': 3, 'base': 0, 'priorities': {}},
-    PRIO_BG_TOP: {'pos': 2, 'base': -1000, 'priorities': {}},
-    PRIO_BG_BY_SIZE: {'pos': 1, 'base': -2000, 'priorities': {}},
+# Required tag names for all classifications
+REQUIRED_TAGS = {
+    'name': 'name',
+    'addr:housenumber': 'addr:housenumber',
+    'addr:housename': 'addr:housename',
+    'ref': 'ref',
+    'int_name': 'int_name',
+    'addr:flats': 'addr:flats'
 }
 
-visibilities = {}
+# Visibility string format prefix
+VISIBILITY_PREFIX = 'world|'
+VISIBILITY_SUFFIX = '|'
 
-prio_ranges[PRIO_OVERLAYS]['comment'] = f'''
-Overlays (icons, captions, path texts and shields) are rendered on top of all the geometry (lines, areas).
-Overlays don't overlap each other, instead the ones with higher priority displace the less important ones.
-Optional captions (which have an icon) are usually displayed only if there are no other overlays in their way
-(technically, max overlays priority value ({OVERLAYS_MAX_PRIORITY}) is subtracted from their priorities automatically).
-'''
+# =============================================================================
+# TYPE ALIASES
+# =============================================================================
 
-prio_ranges[PRIO_FG]['comment'] = '''
-FG geometry: foreground lines and areas (e.g. buildings) are rendered always below overlays
-and always on top of background geometry (BG-top & BG-by-size) even if a foreground feature
-is layer=-10 (as tunnels should be visibile over landcover and water).
-'''
-prio_ranges[PRIO_BG_TOP]['comment'] = '''
-BG-top geometry: background lines and areas that should be always below foreground ones
-(including e.g. layer=-10 underwater tunnels), but above background areas sorted by size (BG-by-size),
-because ordering by size doesn't always work with e.g. water mapped over a forest,
-so water should be on top of other landcover always, but linear waterways should be hidden beneath it.
-Still, e.g. a layer=-1 BG-top feature will be rendered under a layer=0 BG-by-size feature
-(so areal water tunnels are hidden beneath other landcover area) and a layer=1 landcover areas
-are displayed above layer=0 BG-top.
-'''
-prio_ranges[PRIO_BG_BY_SIZE]['comment'] = '''
-BG-by-size geometry: background areas rendered below BG-top and everything else.
-Smaller areas are rendered above larger ones (area's size is estimated as the size of its' bounding box).
-So effectively priority values of BG-by-size areas are not used at the moment.
-But we might use them later for some special cases, e.g. to determine a main area type of a multi-type feature.
-Keep them in a logical importance order please.
-'''
+# Recursive type for nested dictionary values
+DictValue = Union[str, int, float, bool, None, 'Dict[str, DictValue]', 'List[DictValue]']
 
-COMMENT_AUTOFORMAT = '''This file is automatically re-formatted and re-sorted in priorities descending order
-when generate_drules.sh is run. All comments (automatic priorities of e.g. optional captions, drule types visibilities, etc.)
-are generated automatically for information only. Custom formatting and comments are not preserved.
-'''
+# Type for drules element dictionaries (more specific)
+DrawElementDict = Dict[str, Union[int, str, List, Dict, None]]
 
-COMMENT_RANGES_OVERVIEW = '''
-Priorities ranges' rendering order overview:
-- overlays (icons, captions...)
-- FG: foreground areas and lines
-- BG-top: water (linear and areal)
-- BG-by-size: landcover areas sorted by their size
-'''
+# Type for classification dictionaries
+ClassificationDict = Dict[str, Union[str, List[DrawElementDict]]]
 
-# TODO: Implement better error handling
-validation_errors_count = 0
-
-def to_boolean(s):
-    s = s.lower()
-    if s == "true" or s == "yes":
-        return True, True # Valid, True
-    elif s == "false" or s == "no":
-        return True, False # Valid, False
-    else:
-        return False, False # Invalid
-
-def mwm_encode_color(colors, st, prefix='', default='black'):
-    if prefix:
-        prefix += "-"
-    opacity = hex(255 - int(255 * float(st.get(prefix + "opacity", 1))))
-    # TODO: Refactoring idea: here color is converted from float to hex. While MapCSS class
-    #       reads colors from *.mapcss files and converts to float. How about changing MapCSS
-    #       to keep hex values and avoid Hex->Float->Hex operations?
-    color = whatever_to_hex(st.get(prefix + 'color', default))[1:]
-    result = int(opacity + color, 16)
-    colors.add(result)
-    return result
-
-def mwm_encode_image(st, prefix='icon', bgprefix='symbol'):
-    if prefix:
-        prefix += "-"
-    if bgprefix:
-        bgprefix += "-"
-    if prefix + "image" not in st:
-        return False
-    # strip last ".svg"
-    handle = st.get(prefix + "image")[:-4]
-    # TODO: return `handle` only once
-    return handle, handle
+# Type for top-level drules data
+DrulesDataDict = Dict[str, Union[List, List[ClassificationDict]]]
 
 
-def query_style(args):
+# =============================================================================
+# DATA CLASSES FOR TYPE SAFETY
+# =============================================================================
+
+class StyleQueryArgs(NamedTuple):
+    """Arguments for querying style for a classification type."""
+    cl: str  # Classification name
+    cltags: Dict[str, str]  # Classification tags
+    minzoom: int  # Minimum zoom level
+    maxzoom: int  # Maximum zoom level
+
+
+class StyleQueryResult(NamedTuple):
+    """Result from querying style for a classification type."""
+    cl: str  # Classification name
+    zoom: int  # Zoom level
+    runtime_conditions: Optional[List]  # Runtime conditions (MapCSS runtime objects)
+    zstyle: List[Dict[str, str]]  # Style list
+
+
+class StyleAnalysis(NamedTuple):
+    """Result of analyzing style types."""
+    has_lines: bool
+    has_icons: bool
+    has_fills: bool
+    has_text: Optional[List[Dict[str, str]]]
+
+
+# =============================================================================
+# STYLE PROCESSING FUNCTIONS
+# =============================================================================
+
+def query_style(args: StyleQueryArgs) -> List[StyleQueryResult]:
+    """
+    Query styles for a classification type across zoom levels.
+
+    Note: Uses global 'style' variable for multiprocessing efficiency.
+    Passing large MapCSS objects to workers causes significant serialization overhead.
+
+    Args:
+        args: StyleQueryArgs containing classification info and zoom range
+
+    Returns:
+        List of StyleQueryResult objects
+    """
     global style
     cl, cltags, minzoom, maxzoom = args
-    clname = cl if cl.find('-') == -1 else cl[:cl.find('-')]
 
-    cltags["name"] = "name"
-    cltags["addr:housenumber"] = "addr:housenumber"
-    cltags["addr:housename"] = "addr:housename"
-    cltags["ref"] = "ref"
-    cltags["int_name"] = "int_name"
-    cltags["addr:flats"] = "addr:flats"
+    # Extract classification name (before first '-')
+    dash_pos = cl.find('-')
+    clname = cl if dash_pos == -1 else cl[:dash_pos]
+
+    # Add required tags (used for label rendering)
+    cltags.update(REQUIRED_TAGS)
 
     results = []
     for zoom in range(minzoom, maxzoom + 1):
         all_runtime_conditions_arr = []
-        # Get runtime conditions which are used for class 'cl' on zoom 'zoom'
+
+        # Get runtime conditions
         if "area" not in cltags:
             all_runtime_conditions_arr.extend(style.get_runtime_rules(clname, "line", cltags, zoom))
         all_runtime_conditions_arr.extend(style.get_runtime_rules(clname, "area", cltags, zoom))
         if "area" not in cltags:
             all_runtime_conditions_arr.extend(style.get_runtime_rules(clname, "node", cltags, zoom))
 
+        # Filter unique runtime conditions (use hash-based deduplication)
         runtime_conditions_arr = []
         if len(all_runtime_conditions_arr) == 0:
-            # If there is no runtime conditions, do not filter style by runtime conditions
             runtime_conditions_arr.append(None)
         elif len(all_runtime_conditions_arr) == 1:
             runtime_conditions_arr = all_runtime_conditions_arr
         else:
-            # Keep unique conditions only
-            runtime_conditions_arr.append(all_runtime_conditions_arr.pop(0))
-            for new_rt_conditions in all_runtime_conditions_arr:
-                conditions_unique = True
-                for rt_conditions in runtime_conditions_arr:
-                    if new_rt_conditions == rt_conditions:
-                        conditions_unique = False
-                        break
-                if conditions_unique:
-                    runtime_conditions_arr.append(new_rt_conditions)
+            # Use string representation for deduplication (conditions aren't hashable)
+            seen = set()
+            for rt_conditions in all_runtime_conditions_arr:
+                key = str(rt_conditions)
+                if key not in seen:
+                    seen.add(key)
+                    runtime_conditions_arr.append(rt_conditions)
 
         for runtime_conditions in runtime_conditions_arr:
+            # Reuse dictionary instead of creating new ones for better performance
             zstyle = {}
 
-            # Get style for class 'cl' on zoom 'zoom' with corresponding runtime conditions
+            # Get and merge styles (updates zstyle in-place)
             if "area" not in cltags:
-                linestyle = style.get_style_dict(clname, "line", cltags, zoom, olddict=zstyle, filter_by_runtime_conditions=runtime_conditions)
-                zstyle = linestyle
-            areastyle = style.get_style_dict(clname, "area", cltags, zoom, olddict=zstyle, filter_by_runtime_conditions=runtime_conditions)
-            zstyle = areastyle
+                style.get_style_dict(clname, "line", cltags, zoom, olddict=zstyle,
+                                     filter_by_runtime_conditions=runtime_conditions)
+            style.get_style_dict(clname, "area", cltags, zoom, olddict=zstyle,
+                                 filter_by_runtime_conditions=runtime_conditions)
             if "area" not in cltags:
-                nodestyle = style.get_style_dict(clname, "node", cltags, zoom, olddict=zstyle, filter_by_runtime_conditions=runtime_conditions)
-                zstyle = nodestyle
+                style.get_style_dict(clname, "node", cltags, zoom, olddict=zstyle,
+                                     filter_by_runtime_conditions=runtime_conditions)
 
-            results.append((cl, zoom, runtime_conditions, list(zstyle.values())))
+            results.append(StyleQueryResult(
+                cl=cl,
+                zoom=zoom,
+                runtime_conditions=runtime_conditions,
+                zstyle=list(zstyle.values())
+            ))
+
     return results
 
-def get_priorities_filename(prio_range, path):
-    return os.path.join(path, f'priorities_{prio_ranges[prio_range]["pos"]}_{prio_range}.prio.txt')
 
-def load_priorities(prio_range, path, classif, compress = False):
-    def print_warning(msg):
-        print(f'WARNING: {msg} in {fname}:\n\t{line}')
-
-    priority_max = OVERLAYS_MAX_PRIORITY if prio_range == PRIO_OVERLAYS else LAYER_PRIORITY_RANGE
-    priority_min = -OVERLAYS_MAX_PRIORITY if prio_range == PRIO_OVERLAYS else 0
-    fname = get_priorities_filename(prio_range, path)
-    with open(fname, 'r') as f:
-        group = []
-        for line in f:
-            line = line.strip()
-            # Strip comments.
-            line = line.split('#', 1)[0].strip()
-            if not line:
-                continue
-            tokens = line.split()
-            if len(tokens) > 2:
-                print_warning('skipping malformed line')
-                continue
-            if tokens[0] == "===":
-                try:
-                    priority = int(tokens[1])
-                except ValueError:
-                    print_warning('skipping invalid priority value')
-                else:
-                    if priority >= priority_min and priority < priority_max:
-                        if len(group):
-                            for key in group:
-                                prio_ranges[prio_range]['priorities'][key] = priority
-                        else:
-                            print_warning('skipping empty priority group')
-                    else:
-                        print_warning(f'skipping out of [{priority_min};{priority_max}) range priority value')
-                group = []
-            else:
-                cl = tokens[0]
-                object_id = ''
-                oid_pos = cl.find('::')
-                if oid_pos != -1:
-                    object_id = cl[oid_pos:]
-                    cl = cl[0:oid_pos]
-                if cl not in classif:
-                    print_warning('unknown classificator type')
-                key = (cl, object_id)
-                if key in prio_ranges[prio_range]['priorities']:
-                    print_warning(f'overriding previously set priority value {prio_ranges[prio_range]["priorities"][key]}')
-                group.append(key)
-
-        if len(group):
-            line = group
-            print_warning('skipping last types groups with no priority set')
-
-    if prio_range == PRIO_OVERLAYS:
-        for key in prio_ranges[PRIO_OVERLAYS]['priorities'].keys():
-            main_prio_id = None
-            if key[1].startswith('caption'):
-                main_prio_id = (key[0], key[1].replace('caption', 'icon'))
-            if key[1].startswith('pathtext'):
-                main_prio_id = (key[0], key[1].replace('pathtext', 'shield'))
-            if main_prio_id is not None and main_prio_id in prio_ranges[PRIO_OVERLAYS]['priorities']:
-                main_prio = prio_ranges[PRIO_OVERLAYS]['priorities'][main_prio_id]
-                if prio_ranges[PRIO_OVERLAYS]['priorities'][key] > main_prio:
-                    print(f'WARNING: {key} priority is higher than {main_prio_id}, making it equal')
-                    prio_ranges[PRIO_OVERLAYS]['priorities'][key] = main_prio
-
-    # TODO: update compression logic to handle icons put inbetween automatic optional captions priorities.
-    if compress:
-        print(f'Compressing {prio_range} priorities into a (0;{priority_max}) range:')
-        unique_prios = set(prio_ranges[prio_range]['priorities'].values())
-        print(f'\tunique priorities values: {len(unique_prios)}')
-        # Keep gaps at the range borders.
-        base_idx = 1
-        if 0 not in unique_prios:
-            base_idx = 0
-            unique_prios.add(0)
-        unique_prios.add(priority_max)
-        step = min(priority_max / len(unique_prios), 10)
-        print(f'\tnew step between priorities: {step}')
-        unique_prios = sorted(unique_prios)
-        for prio_id in prio_ranges[prio_range]['priorities'].keys():
-            idx = unique_prios.index(prio_ranges[prio_range]['priorities'][prio_id])
-            prio_ranges[prio_range]['priorities'][prio_id] = int(step * (base_idx + idx))
-
-
-def store_visibility(cl, dr_type, object_id, zoom, auto_comment = None):
-    if object_id == '::default':
-        object_id = ''
-    dr_type_comment = (dr_type, auto_comment)
-    if cl not in visibilities:
-        visibilities[cl] = {}
-    if dr_type_comment not in visibilities[cl]:
-        visibilities[cl][dr_type_comment] = {}
-    if object_id not in visibilities[cl][dr_type_comment]:
-        visibilities[cl][dr_type_comment][object_id] = set()
-    visibilities[cl][dr_type_comment][object_id].add(zoom)
-
-
-def prettify_zooms(zooms, maxzoom):
-
-    def add_zrange(first, last, result, maxzoom):
-        first = str(first)
-        last = str(last)
-        if last == str(maxzoom):
-            zrange = first + '-'
-        elif first == last:
-            zrange = first
-        else:
-            zrange = first + '-' + last
-        if result != '':
-            result += ','
-        result += zrange
-        return result
-
-    zooms = sorted(zooms)
-    first = zooms.pop(0)
-    prev = first
-    result = ''
-    for zoom in zooms:
-        if zoom == prev + 1:
-            prev = zoom
-        else:
-            result = add_zrange(first, prev, result, maxzoom)
-            first = zoom
-            prev = zoom
-    return 'z' + add_zrange(first, prev, result, maxzoom)
-
-
-def validate_visibilities(maxzoom):
-    for cl, dr_types_comments in visibilities.items():
-        for dr_type_comment, object_ids in dr_types_comments.items():
-            for object_id, zooms in object_ids.items():
-                zoom_range = prettify_zooms(zooms, maxzoom)
-                if zoom_range.find(',') != -1:
-                    print(f'WARNING: non-contiguous visibility range {zoom_range} for {cl} {dr_type_comment}{object_id}')
-
-                dr_type = dr_type_comment[0]
-                icon_dr_type_comment = ('icon', None)
-                if (dr_type == 'caption' and icon_dr_type_comment in dr_types_comments and
-                    object_id in dr_types_comments[icon_dr_type_comment]):
-                        icon_zooms = sorted(dr_types_comments[icon_dr_type_comment][object_id])
-                        if min(zooms) < icon_zooms[0]:
-                            print(f'WARNING: caption {zoom_range} appears before icon {prettify_zooms(icon_zooms, maxzoom)}'
-                                  f' for {cl}{object_id}')
-
-                line_dr_type_comment = ('line', None)
-                if dr_type in ('pathtext', 'shield'):
-                    lines_min_zoom = maxzoom + 1
-                    if line_dr_type_comment in dr_types_comments:
-                        lines_min_zoom = maxzoom + 1
-                        for line_object_id, line_zooms in dr_types_comments[line_dr_type_comment].items():
-                            min_zoom = min(line_zooms)
-                            if min_zoom < lines_min_zoom:
-                                lines_min_zoom = min_zoom
-                    min_zoom = min(zooms)
-                    if min_zoom < lines_min_zoom:
-                        missing_zooms = prettify_zooms(range(min_zoom, lines_min_zoom), maxzoom)
-                        print(f'ERROR: {dr_type} without line at {missing_zooms} for {cl}{object_id}')
-                        global validation_errors_count
-                        validation_errors_count += 1
-
-def dump_priorities(prio_range, path, maxzoom):
-    with open(get_priorities_filename(prio_range, path), 'w') as outfile:
-        comment = COMMENT_AUTOFORMAT + prio_ranges[prio_range]['comment'] + COMMENT_RANGES_OVERVIEW
-        for s in comment.splitlines():
-            outfile.write(f'# {s}'.rstrip() + '\n')
-        outfile.write('\n')
-
-        if len(prio_ranges[prio_range]['priorities']):
-            dr_types_order = (('icon', 'caption', 'pathtext', 'shield', 'line', 'area') if prio_range == PRIO_OVERLAYS
-                              else ('line', 'area', 'icon', 'caption', 'pathtext', 'shield'))
-            comment_auto_captions = '''
-                All automatic optional captions priorities are below 0.
-                They follow the order of their correspoding icons.
-                '''
-
-            prios = sorted(prio_ranges[prio_range]['priorities'].items(),
-                           key = lambda item: (OVERLAYS_MAX_PRIORITY - item[1], item[0][0], item[0][1]))
-            group_prio = prios[0][1]
-            group = ''
-            group_comment = '# '
-            for p in prios:
-                if p[1] != group_prio:
-                    if prio_range == PRIO_OVERLAYS and comment_auto_captions and group_prio < 0:
-                        for s in comment_auto_captions.splitlines():
-                            outfile.write(f'# {s.strip()}'.rstrip() + '\n')
-                        outfile.write('\n')
-                        comment_auto_captions = None
-                    outfile.write(f'{group}{group_comment}=== {group_prio}\n\n')
-                    group_prio = p[1]
-                    group = ''
-                    group_comment = '# '
-
-                cl = p[0][0]
-                object_id = p[0][1]
-                auto_dr_type = None
-                auto_comment = None
-                if len(p[0]) == 4:
-                    auto_dr_type = p[0][2]
-                    auto_comment = p[0][3]
-
-                line_drules = ''
-                other_drules = ''
-                if cl in visibilities:
-                    for dr_type_comment in sorted(visibilities[cl].keys(), key = lambda drt: dr_types_order.index(drt[0])):
-                        for oid in sorted(visibilities[cl][dr_type_comment].keys()):
-                            dr_type, dr_auto_comment = dr_type_comment
-                            dr_zoom = dr_type + oid
-                            if dr_auto_comment is not None:
-                                dr_zoom = f'{dr_zoom}({dr_auto_comment})'
-                            dr_zoom += ' ' + prettify_zooms(visibilities[cl][dr_type_comment][oid], maxzoom)
-                            # Drules matching this prio_range and object_id and
-                            # - an auto priority dr_type match or
-                            # - any other non-auto dr_type suitable
-                            is_auto_dr_match = dr_type == auto_dr_type and dr_auto_comment == auto_comment
-                            is_not_auto_dr = auto_dr_type is None and dr_auto_comment is None
-                            is_suitable_for_range = (
-                                (prio_range == PRIO_OVERLAYS and dr_type in ('icon', 'caption', 'pathtext', 'shield')) or
-                                (prio_range in (PRIO_FG, PRIO_BG_TOP) and dr_type in ('line', 'area')) or
-                                (prio_range == PRIO_BG_BY_SIZE and dr_type == 'area'))
-                            if oid == object_id and (is_auto_dr_match or is_not_auto_dr and is_suitable_for_range):
-                                if line_drules:
-                                    line_drules += ' and '
-                                line_drules += dr_zoom
-                            else:
-                                # Drules from other prio_ranges or with other object_ids.
-                                if other_drules:
-                                    other_drules += ', '
-                                other_drules += dr_zoom
-                if object_id:
-                    cl += object_id
-                if not line_drules:
-                    if other_drules:
-                        line_drules = "WARNING: no drule defined for the priority"
-                    else:
-                        line_drules = "WARNING: no style defined (the type will be not included into map data)"
-                    print(f'{line_drules} for {cl} in {prio_range}')
-
-                info = '# ' + line_drules
-                if other_drules:
-                    info += f' (also has {other_drules})'
-                if auto_dr_type is None:
-                    group_comment = ''
-                else:
-                    cl = '# ' + cl
-                group += f'{cl:50}  {info}\n'
-
-            outfile.write(f'{group}{group_comment}=== {group_prio}\n')
-
-def get_drape_priority(cl, dr_type, object_id, auto_dr_type = None, auto_comment = None, auto_prio_mod = 0):
-    if object_id == '::default':
-        object_id = ''
-    prio_id = (cl, object_id)
-
-    ranges_to_check = (PRIO_OVERLAYS, )
-    if dr_type == 'line':
-        ranges_to_check = (PRIO_FG, PRIO_BG_TOP)
-    elif dr_type == 'area':
-        ranges_to_check = (PRIO_BG_BY_SIZE, PRIO_BG_TOP, PRIO_FG)
-    for r in ranges_to_check:
-        if prio_id in prio_ranges[r]['priorities']:
-            priority = prio_ranges[r]['priorities'][prio_id]
-            if auto_dr_type is not None:
-                min_priority = -OVERLAYS_MAX_PRIORITY if r == PRIO_OVERLAYS else 0
-                priority = max(priority + auto_prio_mod, min_priority)
-                auto_prio_id = (cl, object_id, auto_dr_type, auto_comment)
-                prio_ranges[r]['priorities'][auto_prio_id] = priority
-            return priority + prio_ranges[r]['base']
-
-    print(f'ERROR: priority is not set for {dr_type} {cl}{object_id}')
-    global validation_errors_count
-    validation_errors_count += 1
-    return 0
-
-
-# TODO: Split large function to smaller ones
-def komap_mapswithme(options):
-    if options.data and os.path.isdir(options.data):
-        ddir = options.data
-    else:
-        ddir = os.path.dirname(options.outfile)
-
-    classificator = {}
-    class_order = []
-    class_tree = {}
-
-    # TODO: Introduce new function to parse `colors.txt` for better testability
-    colors_file_name = os.path.join(ddir, 'colors.txt')
-    colors = set()
-    if os.path.exists(colors_file_name):
-        colors_in_file = open(colors_file_name, "r")
-        for colorLine in colors_in_file:
-            colors.add(int(colorLine))
-        colors_in_file.close()
-
-    # TODO: Introduce new function to parse `patterns.txt` for better testability
-    patterns = []
-    def addPattern(dashes):
-        if dashes and dashes not in patterns:
-            patterns.append(dashes)
-
-    patterns_file_name = os.path.join(ddir, 'patterns.txt')
-    if os.path.exists(patterns_file_name):
-        patterns_in_file = open(patterns_file_name, "r")
-        for patternsLine in patterns_in_file:
-            addPattern([float(x) for x in patternsLine.split()])
-        patterns_in_file.close()
-
-    # Build classificator tree from mapcss-mapping.csv file
-    types_file = open(os.path.join(ddir, 'types.txt'), "w")
-
-    # The mapcss-mapping.csv format is described inside the file itself.
-    # TODO: introduce new function to parse 'mapcss-mapping.csv' for better testability
-    cnt = 1
-    unique_types_check = set()
-    mapping_file = open(os.path.join(ddir, 'mapcss-mapping.csv'))
-    for row in csv.reader(mapping_file, delimiter=';'):
-        if len(row) <= 1 or row[0].startswith('#'):
-            # Allow for empty lines and comment lines starting with '#'.
-            continue
-        if len(row) == 3:
-            # Short format: type name, type id, x / replacement type name
-            tag = row[0].replace('|', '=')
-            obsolete = len(row[2].strip()) > 0
-            row = (row[0], '[{0}]'.format(tag), 'x' if obsolete else '', 'name', 'int_name', row[1], row[2] if row[2] != 'x' else '')
-        if len(row) != 7:
-            raise Exception('Expecting 3 or 7 columns in mapcss-mapping: {0}'.format(';'.join(row)))
-
-        if int(row[5]) < cnt:
-            raise Exception('Wrong type id: {0}'.format(';'.join(row)))
-        while int(row[5]) > cnt:
-            print("mapswithme", file=types_file)
-            cnt += 1
-        cnt += 1
-
-        cl = row[0].replace("|", "-")
-        if cl in unique_types_check and row[2] != 'x':
-            raise Exception('Duplicate type: {0}'.format(row[0]))
-        pairs = [i.strip(']').split("=") for i in row[1].split(',')[0].split('[')]
-        kv = OrderedDict()
-        for i in pairs:
-            if len(i) == 1:
-                if i[0]:
-                    if i[0][0] == "!":
-                        kv[i[0][1:].strip('?')] = "no"
-                    else:
-                        kv[i[0].strip('?')] = "yes"
-            else:
-                kv[i[0]] = i[1]
-        if row[2] != "x":
-            classificator[cl] = kv
-            class_order.append(cl)
-            unique_types_check.add(cl)
-            # Mark original type to distinguish it among replacing types.
-            print("*" + row[0], file=types_file)
-        else:
-            # compatibility mode
-            if row[6]:
-                print(row[6], file=types_file)
-            else:
-                print("mapswithme", file=types_file)
-        class_tree[cl] = row[0]
-    class_order.sort()
-    mapping_file.close()
-    types_file.close()
-
-    output = ''
-    for prio_range in prio_ranges.keys():
-        load_priorities(prio_range, options.priorities_path, unique_types_check, compress = False)
-        output += f'{"" if not output else ", "}{len(prio_ranges[prio_range]["priorities"])} {prio_range}'
-    print(f'Loaded priorities: {output}.')
-
-    del unique_types_check
-
-    # Get all mapcss static tags which are used in mapcss-mapping.csv
-    # This is a dict with main_tag flags (True = appears first in types)
-    mapcss_static_tags = {}
-    for v in list(classificator.values()):
-        for i, t in enumerate(v.keys()):
-            mapcss_static_tags[t] = mapcss_static_tags.get(t, True) and i == 0
-
-    # TODO: Introduce new function to parse `mapcss-dynamic.txt` for better testability
-    # Get all mapcss dynamic tags from mapcss-dynamic.txt
-    with open(os.path.join(ddir, 'mapcss-dynamic.txt')) as dynamic_file:
-        mapcss_dynamic_tags = set([line.rstrip() for line in dynamic_file])
-
-    # Parse style mapcss
-    global style
-    style = MapCSS(options.minzoom, options.maxzoom)
-    style.parse(clamp=False, stretch=LAYER_PRIORITY_RANGE,
-                filename=options.filename, static_tags=mapcss_static_tags,
-                dynamic_tags=mapcss_dynamic_tags)
-
-    # Build optimization tree - class/zoom/type -> StyleChoosers
-    clname_cltag_unique = set()
-    for cl in class_order:
-        clname = cl if cl.find('-') == -1 else cl[:cl.find('-')]
-        # Get first tag of the class/type.
-        cltag = next(iter(classificator[cl].keys()))
-        clname_cltag = clname + '$' + cltag
-        if clname_cltag not in clname_cltag_unique:
-            clname_cltag_unique.add(clname_cltag)
-            style.build_choosers_tree(clname, "line", cltag)
-            style.build_choosers_tree(clname, "area", cltag)
-            style.build_choosers_tree(clname, "node", cltag)
-
-    style.finalize_choosers_tree()
-
-    # TODO: Introduce new function to work with colors for better testability
-    # Get colors section from style
+def _extract_style_colors(style: MapCSS, colors: Set[int]) -> Dict[str, int]:
+    """Extract and encode colors from style."""
     style_colors = {}
     raw_style_colors = style.get_colors()
     if raw_style_colors is not None:
@@ -601,412 +169,582 @@ def komap_mapswithme(options):
             unique_style_colors.add(k[:k.rindex('-')])
         for k in unique_style_colors:
             style_colors[k] = mwm_encode_color(colors, raw_style_colors, k)
+    return style_colors
 
-    visibility = {}
 
-    dr_linecaps = {'none': BUTTCAP, 'butt': BUTTCAP, 'round': ROUNDCAP}
-    dr_linejoins = {'none': NOJOIN, 'bevel': BEVELJOIN, 'round': ROUNDJOIN}
-
-    # Build drules tree
-
-    drules = ContainerProto()
-    dr_cont = None
-    if MULTIPROCESSING:
-        set_start_method('fork')  # Use fork with multiprocessing to share global variables among Python instances
-        pool = Pool()
-        imapfunc = pool.imap
-    else:
-        imapfunc = map
-
+def _add_colors_to_drules(drules_data: DrulesDataDict, style_colors: Dict[str, int]) -> None:
+    """Add color definitions to drules data dictionary."""
     if style_colors:
+        drules_data['colors'] = []
         for k, v in sorted(list(style_colors.items())):
-            color_proto = ColorElementProto()
-            color_proto.name = k
-            color_proto.color = v
-            color_proto.x = 0
-            color_proto.y = 0
-            drules.colors.value.extend([color_proto])
+            drules_data['colors'].append({
+                'name': k,
+                'color': v,
+                'x': 0,
+                'y': 0
+            })
 
-    all_draw_elements = set()
 
-    # TODO: refactor next for-loop for readability and testability
-    global validation_errors_count
-    visstring = None
-    for results in imapfunc(query_style, ((cl, classificator[cl], options.minzoom, options.maxzoom) for cl in class_order)):
-        for result in results:
-                cl, zoom, runtime_conditions, zstyle = result
+def _analyze_style_types(zstyle: List[Dict[str, str]]) -> StyleAnalysis:
+    """
+    Analyze what types of styles are present (lines, fills, icons, text).
 
-                # First, sort rules by ::object-id in captions (primary, secondary, none ..)
-                # then by other ::object-id in ascending order.
-                def rule_sort_key(dict_):
-                    first = 0
-                    if dict_.get('text'):
-                        if str(dict_.get('object-id')) != '::default':
-                            first = 1
-                        if str(dict_.get('text')) == 'none':
-                            first = 2
-                    return (first, dict_.get('object-id'))
+    Returns:
+        StyleAnalysis with flags indicating which style types are present
+    """
+    has_lines = False
+    has_icons = False
+    has_fills = False
+    has_text = None
+    txfmt = []
 
-                zstyle.sort(key = rule_sort_key)
+    # Check for each style type
+    for st in zstyle:
+        # Filter out empty/zero values for analysis
+        st = {k: v for k, v in st.items() if str(v).strip(" 0.")}
 
-                # For debug purpose.
-                # if str(cl) == 'highway-path' and int(zoom) == 19:
-                #     print(cl)
-                #     print(zstyle)
+        if 'width' in st or 'pattern-image' in st:
+            has_lines = True
+        if st.get(
+                'icon-image') != 'none' if 'icon-image' in st else False or 'symbol-shape' in st or 'symbol-image' in st:
+            has_icons = True
+        if st.get('fill-color') != 'none' if 'fill-color' in st else False:
+            has_fills = True
 
-                if dr_cont is not None and dr_cont.name != cl:
-                    if dr_cont.element:
-                        drules.cont.extend([dr_cont])
-                    visibility["world|" + class_tree[dr_cont.name] + "|"] = "".join(visstring)
+    # Collect unique text styles
+    for st in zstyle:
+        text_value = st.get('text')
+        if text_value and text_value != 'none' and text_value not in txfmt:
+            txfmt.append(text_value)
+            if has_text is None:
+                has_text = []
+            has_text.append(st)
+
+    return StyleAnalysis(
+        has_lines=has_lines,
+        has_icons=has_icons,
+        has_fills=has_fills,
+        has_text=has_text
+    )
+
+
+def _create_draw_element(zoom: int, runtime_conditions: Optional[List]) -> DrawElementDict:
+    """Create and initialize a draw element dictionary."""
+    dr_element = {
+        'scale': zoom,
+        'apply_if': [],
+        'lines': [],
+        'area': None,
+        'symbol': None,
+        'caption': None,
+        'circle': None,
+        'path_text': None,
+        'shield': None
+    }
+
+    if runtime_conditions:
+        for rc in runtime_conditions:
+            dr_element['apply_if'].append(str(rc))
+
+    return dr_element
+
+
+class ProcessingResult(NamedTuple):
+    """Result of processing a single style."""
+    has_icons: bool
+    has_text: Optional[List[Dict[str, str]]]
+    has_fills: bool
+
+
+def _process_single_style(st: Dict[str, str], zstyle: List[Dict[str, str]],
+                          style_processor: StyleProcessor, dr_element: DrawElementDict,
+                          analysis: StyleAnalysis,
+                          zoom: int, cl: str, colors: Set[int]) -> ProcessingResult:
+    """
+    Process a single style rule and update the draw element dictionary.
+
+    NOTE: This function has side effects - it MUTATES dr_element by adding
+    lines, areas, symbols, captions, etc. based on the style rules.
+
+    Args:
+        st: Single style rule dictionary
+        zstyle: Complete list of style rules (for context)
+        style_processor: Style processor instance
+        dr_element: Draw element dictionary (MUTATED IN-PLACE)
+        analysis: Analysis results of what style types are present
+        zoom: Current zoom level
+        cl: Classification name
+        colors: Set of color values
+
+    Returns:
+        ProcessingResult with updated flags for icons, text, and fills
+    """
+    has_lines = analysis.has_lines
+    has_fills = analysis.has_fills
+    has_icons = analysis.has_icons
+    has_text = analysis.has_text
+
+    # Process casing and area borders together (they're related)
+    if st.get('casing-width') not in (None, 0) or st.get('casing-width-add') is not None:
+        is_area_st = 'fill-color' in st
+
+        # Process casing lines
+        casing_lines = style_processor.process_casing(st, zstyle, has_lines, has_fills, zoom, cl)
+        dr_element['lines'].extend(casing_lines)
+
+        # Process casing border for areas
+        # In protobuf, dr_element.area.border can be set without dr_element.area.color
+        # Area borders only have width and color, NOT cap/join (those are only for lines)
+        if has_fills and is_area_st and float(st.get('fill-opacity', 1)) > 0:
+            # Ensure area dict exists (even if fill color not set yet)
+            if dr_element['area'] is None:
+                dr_element['area'] = {
+                    'color': 0,  # Will be set by process_area_rule if fill-color exists
+                    'priority': 0,
+                    'border': None
+                }
+
+            # Set the border (width and color ONLY, no cap/join)
+            dr_element['area']['border'] = {
+                'width': st.get('casing-width', 0),
+                'color': mwm_encode_color(colors, st, "casing"),
+                'dashdot': None  # Could have dashdot, but not cap/join
+            }
+
+    # Process lines
+    if has_lines:
+        line_rules = style_processor.process_line_rules(st, zoom, cl)
+        dr_element['lines'].extend(line_rules)
+
+    # Process shield
+    style_processor.process_shield_rule(st, zoom, cl, dr_element)
+
+    # Process icons and circles
+    has_icons = style_processor.process_icon_and_circle(st, zoom, cl, dr_element, has_icons)
+
+    # Process text/captions
+    has_text = style_processor.process_text_rules(st, has_text, zoom, cl, dr_element)
+
+    # Process area fills
+    has_fills = style_processor.process_area_rule(st, zoom, cl, dr_element, has_fills)
+
+    return ProcessingResult(
+        has_icons=has_icons,
+        has_text=has_text,
+        has_fills=has_fills
+    )
+
+
+class ClassificationProcessingResult(NamedTuple):
+    """Result of processing a classification."""
+    dr_cont: Optional[ClassificationDict]
+    visstring: List[str]
+
+
+def _process_classification_result(result: StyleQueryResult,
+                                   options: Values, classificator_mgr: ClassificatorManager,
+                                   style_processor: StyleProcessor, colors: Set[int],
+                                   dr_cont: Optional[ClassificationDict], visstring: List[str],
+                                   all_draw_elements: Set[str],
+                                   visibility: Dict[str, str]) -> ClassificationProcessingResult:
+    """
+    Process a single classification result and generate draw element.
+
+    Args:
+        result: StyleQueryResult containing style data for one zoom level
+        options: Command-line options
+        classificator_mgr: Classification manager
+        style_processor: Style processor instance
+        colors: Set of color values
+        dr_cont: Current classification container (or None for new)
+        visstring: Visibility string array
+        all_draw_elements: Set of unique draw element strings (for deduplication)
+        visibility: Visibility dictionary
+
+    Returns:
+        ClassificationProcessingResult with updated dr_cont and visstring
+    """
+    cl = result.cl
+    zoom = result.zoom
+    runtime_conditions = result.runtime_conditions
+    zstyle = result.zstyle
+
+    # Sort rules by object-id for consistent ordering
+    # Priority order:
+    # 1. Rules with text and custom object-id (not ::default)
+    # 2. Rules with text='none'
+    # 3. All other rules
+    def rule_sort_key(dict_):
+        first = 0
+        if dict_.get('text'):
+            if str(dict_.get('object-id')) != '::default':
+                first = 1  # Custom object-id rules come first
+            if str(dict_.get('text')) == 'none':
+                first = 2  # text='none' rules come last
+        return (first, dict_.get('object-id'))
+
+    zstyle.sort(key=rule_sort_key)
+
+    if len(zstyle) == 0:
+        return ClassificationProcessingResult(dr_cont, visstring)
+
+    # Analyze style types
+    analysis = _analyze_style_types(zstyle)
+
+    if not (analysis.has_lines or analysis.has_text or analysis.has_fills or analysis.has_icons):
+        return ClassificationProcessingResult(dr_cont, visstring)
+
+    visstring[zoom] = "1"
+
+    if zoom == 0:
+        return ClassificationProcessingResult(dr_cont, visstring)
+
+    # Create and populate draw element
+    dr_element = _create_draw_element(zoom, runtime_conditions)
+
+    # Process all style rules
+    for st in zstyle:
+        result = _process_single_style(
+            st, zstyle, style_processor, dr_element,
+            analysis,
+            zoom, cl, colors
+        )
+        # Update analysis with results from processing
+        analysis = StyleAnalysis(
+            has_lines=analysis.has_lines,
+            has_fills=result.has_fills,
+            has_icons=result.has_icons,
+            has_text=result.has_text
+        )
+
+    # Add draw element if unique
+    # Use JSON for consistent string representation regardless of dict order
+    str_dr_element = dr_cont['name'] + "/" + json.dumps(dr_element, sort_keys=True)
+    if str_dr_element not in all_draw_elements:
+        all_draw_elements.add(str_dr_element)
+        dr_cont['elements'].append(dr_element)
+
+    return ClassificationProcessingResult(dr_cont, visstring)
+
+
+class ProcessStylesResult(NamedTuple):
+    """Result of processing all styles."""
+    drules_data: DrulesDataDict
+    visibility: Dict[str, str]
+    validation_errors: int
+
+
+def process_styles(options: Values, style_obj: MapCSS, classificator_mgr: ClassificatorManager,
+                   priority_mgr: PriorityManager, visibility_tracker: VisibilityTracker,
+                   colors: Set[int],
+                   add_pattern_func: Callable[[List[float]], None],
+                   use_multiprocessing: bool = True) -> ProcessStylesResult:
+    """
+    Process all styles and generate drules.
+
+    Args:
+        options: Command line options
+        style_obj: MapCSS style object
+        classificator_mgr: ClassificatorManager instance
+        priority_mgr: PriorityManager instance
+        visibility_tracker: VisibilityTracker instance
+        file_io_mgr: FileIOManager instance
+        colors: Set of colors
+        add_pattern_func: Function to add patterns
+        use_multiprocessing: Whether to use multiprocessing (default: True)
+
+    Returns:
+        ProcessStylesResult with drules_data, visibility, and validation_errors
+    """
+    # Set global for multiprocessing workers (avoids pickling large object)
+    global style
+    style = style_obj
+
+    # Extract and add style colors
+    style_colors = _extract_style_colors(style_obj, colors)
+
+    # Initialize drules data structure (dictionary, not protobuf)
+    drules_data: DrulesDataDict = {
+        'colors': [],
+        'classifications': []
+    }
+    _add_colors_to_drules(drules_data, style_colors)
+
+    # Setup multiprocessing or use serial map
+    pool_context = None
+    if use_multiprocessing:
+        try:
+            set_start_method('fork', force=False)
+        except RuntimeError:
+            # Already set, ignore
+            pass
+        pool_context = Pool()
+        mapper = pool_context.imap
+    else:
+        mapper = map
+
+    # Create style processor
+    style_processor = StyleProcessor(priority_mgr, visibility_tracker, colors, add_pattern_func)
+
+    try:
+        # Process all classifications
+        dr_cont: Optional[ClassificationDict] = None
+        all_draw_elements: Set[str] = set()
+        visibility: Dict[str, str] = {}
+
+        for results in mapper(query_style,
+                              (StyleQueryArgs(cl, classificator_mgr.classificator[cl], options.minzoom, options.maxzoom)
+                               for cl in classificator_mgr.class_order)):
+            for result in results:
+                # Handle classification changes
+                if dr_cont is not None and dr_cont['name'] != result.cl:
+                    if dr_cont['elements']:
+                        drules_data['classifications'].append(dr_cont)
+                    visibility["world|" + classificator_mgr.class_tree[dr_cont['name']] + "|"] = "".join(visstring)
                     dr_cont = None
 
                 if dr_cont is None:
-                    dr_cont = ClassifElementProto()
-                    dr_cont.name = cl
-
+                    dr_cont = {
+                        'name': result.cl,
+                        'elements': []
+                    }
                     visstring = ["0"] * (options.maxzoom - options.minzoom + 1)
 
-                if len(zstyle) == 0:
-                    continue
+                # Process this classification result
+                processing_result = _process_classification_result(
+                    result, options, classificator_mgr, style_processor,
+                    colors, dr_cont, visstring, all_draw_elements, visibility
+                )
+                dr_cont = processing_result.dr_cont
+                visstring = processing_result.visstring
 
-                has_lines = False
-                has_icons = False
-                has_fills = False
-                for st in zstyle:
-                    st = dict([(k, v) for k, v in st.items() if str(v).strip(" 0.")])
-                    if 'width' in st or 'pattern-image' in st:
-                        has_lines = True
-                    if 'icon-image' in st and st.get('icon-image') != 'none' or 'symbol-shape' in st or 'symbol-image' in st:
-                        has_icons = True
-                    if 'fill-color' in st and st.get('fill-color') != 'none':
-                        has_fills = True
+        # Add last classification
+        if dr_cont is not None:
+            if dr_cont['elements']:
+                drules_data['classifications'].append(dr_cont)
+            visibility["world|" + classificator_mgr.class_tree[dr_cont['name']] + "|"] = "".join(visstring)
 
-                has_text = None
-                txfmt = []
-                for st in zstyle:
-                    if st.get('text') and st.get('text') != 'none' and st.get('text') not in txfmt:
-                        txfmt.append(st.get('text'))
-                        if has_text is None:
-                            has_text = []
-                        has_text.append(st)
+    finally:
+        # Ensure pool is cleaned up
+        if pool_context is not None:
+            pool_context.close()
+            pool_context.join()
 
-                if (not has_lines) and (not has_text) and (not has_fills) and (not has_icons):
-                    continue
+    return ProcessStylesResult(
+        drules_data=drules_data,
+        visibility=visibility,
+        validation_errors=style_processor.validation_errors_count
+    )
 
-                visstring[zoom] = "1"
 
-                if zoom == 0:
-                    continue
+def main(options=None) -> None:
+    """Main entry point for drules generation.
 
-                dr_element = DrawElementProto()
-                dr_element.scale = zoom
+    Args:
+        options: Pre-built options object (e.g. from tests). If None, options are
+                 parsed from command-line arguments.
+    """
+    # Setup logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
 
-                if runtime_conditions:
-                    for rc in runtime_conditions:
-                        dr_element.apply_if.append(str(rc))
+    if options is None:
+        parser = OptionParser()
+        parser.add_option("-s", "--stylesheet", dest="filename",
+                          help="read MapCSS stylesheet from FILE", metavar="FILE")
+        parser.add_option("-f", "--minzoom", dest="minzoom", default=0, type="int",
+                          help="minimal available zoom level", metavar="ZOOM")
+        parser.add_option("-t", "--maxzoom", dest="maxzoom", default=20, type="int",
+                          help="maximal available zoom level", metavar="ZOOM")
+        parser.add_option("-o", "--output-file", dest="outfile", default="-",
+                          help="output filename", metavar="FILE")
+        parser.add_option("-x", "--txt", dest="txt", action="store_true",
+                          help="create a text file for output", default=False)
+        parser.add_option("-p", "--priorities-path", dest="priorities_path",
+                          help="path to priorities *.prio.txt files", metavar="PATH")
+        parser.add_option("-d", "--data-path", dest="data",
+                          help="path to mapcss-mapping.csv and other files", metavar="PATH")
+        parser.add_option("-v", "--verbose", dest="verbose", action="store_true",
+                          help="enable verbose logging", default=False)
+        parser.add_option("--multiprocessing", dest="multiprocessing", action="store_true",
+                          help="enable multiprocessing", default=True)
 
-                for st in zstyle:
-                    if st.get('casing-width') not in (None, 0) or st.get('casing-width-add') is not None:  # and (st.get('width') or st.get('fill-color')):
-                        is_area_st = 'fill-color' in st
-                        if has_lines and not is_area_st and st.get('casing-linecap', 'butt') == 'butt':
-                            dr_line = LineRuleProto()
+        (options, args) = parser.parse_args()
 
-                            base_width = st.get('width', 0)
-                            if base_width == 0:
-                                for wst in zstyle:
-                                    if wst.get('width') not in (None, 0):
-                                        # Rail bridge styles use width from ::dash object instead of ::default.
-                                        if base_width == 0 or wst.get('object-id') != '::default':
-                                            base_width = wst.get('width', 0)
-                                # 'casing-width' has precedence over 'casing-width-add'.
-                                if st.get('casing-width') in (None, 0):
-                                    st['casing-width'] = base_width + st.get('casing-width-add')
-                                    base_width = 0
+        # Validate required options
+        if not options.filename:
+            parser.error("MapCSS stylesheet filename is required (-s/--stylesheet)")
+        if not os.path.isfile(options.filename):
+            parser.error(f"MapCSS stylesheet file not found: {options.filename}")
+        if options.outfile == "-":
+            parser.error("Please specify base output path (-o/--output-file)")
+        if not options.priorities_path:
+            parser.error("A path to priorities *.prio.txt files is required (-p/--priorities-path)")
+        if not os.path.isdir(options.priorities_path):
+            parser.error(f"Priorities path is not a directory: {options.priorities_path}")
 
-                            dr_line.width = round(base_width + st.get('casing-width') * 2, 2)
-                            dr_line.color = mwm_encode_color(colors, st, "casing")
-                            if st.get('object-id') == '::default':
-                                # An automatic casing line should be rendered below the "main" line, hence auto priority -1.
-                                auto_comment = 'casing'
-                                dr_line.priority = get_drape_priority(cl, 'line', st.get('object-id'), 'line', auto_comment, -1)
-                                store_visibility(cl, 'line', st.get('object-id'), zoom, auto_comment)
-                            else:
-                                # A casing line explicitly defined via ::object_id.
-                                dr_line.priority = get_drape_priority(cl, 'line', st.get('object-id'))
-                                store_visibility(cl, 'line', st.get('object-id'), zoom)
-                            for i in st.get('casing-dashes', st.get('dashes', [])):
-                                dr_line.dashdot.dd.extend([float(i)])
-                            addPattern(dr_line.dashdot.dd)
-                            dr_line.cap = dr_linecaps.get(st.get('casing-linecap', 'butt'), BUTTCAP)
-                            dr_line.join = dr_linejoins.get(st.get('casing-linejoin', 'round'), ROUNDJOIN)
-                            dr_element.lines.extend([dr_line])
+    # Apply defaults for any attributes not set by the caller
+    if not hasattr(options, 'verbose'):
+        options.verbose = False
+    if not hasattr(options, 'multiprocessing'):
+        options.multiprocessing = True
+    if not hasattr(options, 'txt'):
+        options.txt = False
+    if not hasattr(options, 'minzoom'):
+        options.minzoom = 0
+    if not hasattr(options, 'maxzoom'):
+        options.maxzoom = 20
 
-                        if has_fills and is_area_st and float(st.get('fill-opacity', 1)) > 0:
-                            dr_element.area.border.color = mwm_encode_color(colors, st, "casing")
-                            dr_element.area.border.width = st.get('casing-width', 0)
+    # Adjust logging level if verbose
+    if options.verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
+        logger.debug("Verbose logging enabled")
 
-                        # Let's try without this additional line style overhead. Needed only for casing in road endings.
-                        # if st.get('casing-linecap', st.get('linecap', 'round')) != 'butt':
-                        #     dr_line = LineRuleProto()
-                        #     dr_line.width = st.get('width', 0) + (st.get('casing-width') * 2)
-                        #     dr_line.color = mwm_encode_color(colors, st, "casing")
-                        #     dr_line.priority = -15000
-                        #     dashes = st.get('casing-dashes', st.get('dashes', []))
-                        #     dr_line.dashdot.dd.extend(dashes)
-                        #     dr_line.cap = dr_linecaps.get(st.get('casing-linecap', 'round'), ROUNDCAP)
-                        #     dr_line.join = dr_linejoins.get(st.get('casing-linejoin', 'round'), ROUNDJOIN)
-                        #     dr_element.lines.extend([dr_line])
+    # Normalize and validate paths
+    options.priorities_path = os.path.normpath(os.path.abspath(options.priorities_path))
+    options.filename = os.path.normpath(os.path.abspath(options.filename))
+    options.outfile = os.path.normpath(os.path.abspath(options.outfile))
 
-                    if has_lines:
-                        if st.get('width'):
-                            dr_line = LineRuleProto()
-                            dr_line.width = st.get('width', 0)
-                            dr_line.color = mwm_encode_color(colors, st)
-                            for i in st.get('dashes', []):
-                                dr_line.dashdot.dd.extend([float(i)])
-                            addPattern(dr_line.dashdot.dd)
-                            dr_line.cap = dr_linecaps.get(st.get('linecap', 'butt'), BUTTCAP)
-                            dr_line.join = dr_linejoins.get(st.get('linejoin', 'round'), ROUNDJOIN)
-                            dr_line.priority = get_drape_priority(cl, 'line', st.get('object-id'))
-                            store_visibility(cl, 'line', st.get('object-id'), zoom)
-                            dr_element.lines.extend([dr_line])
-                        if st.get('pattern-image'):
-                            dr_line = LineRuleProto()
-                            dr_line.width = 0
-                            dr_line.color = 0
-                            icon = mwm_encode_image(st, prefix='pattern')
-                            dr_line.pathsym.name = icon[0]
-                            dr_line.pathsym.step = float(st.get('pattern-spacing', 0)) - 16
-                            dr_line.pathsym.offset = st.get('pattern-offset', 0)
-                            dr_line.priority = get_drape_priority(cl, 'line', st.get('object-id'))
-                            store_visibility(cl, 'line', st.get('object-id'), zoom)
-                            dr_element.lines.extend([dr_line])
+    # Determine data directory
+    if options.data and os.path.isdir(options.data):
+        ddir = options.data
+    else:
+        ddir = os.path.dirname(options.outfile)
 
-                    if st.get('shield-font-size'):
-                        dr_element.shield.height = int(st.get('shield-font-size', 10))
-                        dr_element.shield.text_color = mwm_encode_color(colors, st, "shield-text")
-                        if st.get('shield-text-halo-radius', 0) != 0:
-                            dr_element.shield.text_stroke_color = mwm_encode_color(colors, st, "shield-text-halo", "white")
-                        dr_element.shield.color = mwm_encode_color(colors, st, "shield")
-                        if st.get('shield-outline-radius', 0) != 0:
-                            dr_element.shield.stroke_color = mwm_encode_color(colors, st, "shield-outline", "white")
-                        dr_element.shield.priority = get_drape_priority(cl, 'shield', st.get('object-id'))
-                        store_visibility(cl, 'shield', st.get('object-id'), zoom)
-                        if st.get('shield-min-distance', 0) != 0:
-                            dr_element.shield.min_distance = int(st.get('shield-min-distance', 0))
+    logger.info("Starting drules generation")
+    logger.debug(f"Output path: {options.outfile}")
+    logger.debug(f"Data directory: {ddir}")
+    logger.debug(f"Priorities path: {options.priorities_path}")
 
-                    if has_icons:
-                        if st.get('icon-image') and st.get('icon-image') != 'none':
-                            icon = mwm_encode_image(st)
-                            dr_element.symbol.name = icon[0]
-                            dr_element.symbol.priority = get_drape_priority(cl, 'icon', st.get('object-id'))
-                            store_visibility(cl, 'icon', st.get('object-id'), zoom)
-                            if 'icon-min-distance' in st:
-                                dr_element.symbol.min_distance = int(st.get('icon-min-distance', 0))
-                            has_icons = False
-                        if st.get('symbol-shape'):
-                            # TODO: not used in current styles; do "circles" work in drape at all?
-                            dr_element.circle.radius = float(st.get('symbol-size'))
-                            dr_element.circle.color = mwm_encode_color(colors, st, 'symbol-fill')
-                            dr_element.circle.priority = get_drape_priority(cl, 'circle', st.get('object-id'))
-                            store_visibility(cl, 'circle', st.get('object-id'), zoom)
-                            has_icons = False
+    # Initialize managers
+    logger.info("Initializing managers...")
+    prio_ranges = get_prio_ranges()
+    priority_mgr = PriorityManager(prio_ranges)
+    classificator_mgr = ClassificatorManager()
+    file_io_mgr = FileIOManager(ddir)
+    visibility_tracker = VisibilityTracker()
 
-                    if has_text and st.get('text') and st.get('text') != 'none':
-                        # Take only first 2 captions: primary, secondary.
-                        has_text = has_text[:2]
+    # Load data files
+    logger.info("Loading data files...")
+    colors = file_io_mgr.load_colors()
+    logger.debug(f"Loaded {len(colors)} colors")
+    patterns, add_pattern = file_io_mgr.load_patterns()
+    logger.debug(f"Loaded {len(patterns)} patterns")
 
-                        dr_text = dr_element.caption
-                        text_priority_key = 'caption'
-                        if st.get('text-position', 'center') == 'line':
-                            dr_text = dr_element.path_text
-                            text_priority_key = 'pathtext'
+    # Parse classificator
+    logger.info("Parsing classificator...")
+    unique_types_check = classificator_mgr.parse_mapcss_mapping(ddir)
+    logger.debug(f"Parsed {len(unique_types_check)} unique types")
 
-                        dr_cur_subtext = dr_text.primary
-                        for sp in has_text:
-                            dr_cur_subtext.height = int(float(sp.get('font-size', "10").split(",")[0]))
-                            if 'text-color' not in st:
-                                print(f'ERROR: text-color not set for z{zoom} {cl}')
-                                validation_errors_count += 1
-                            dr_cur_subtext.color = mwm_encode_color(colors, sp, "text")
-                            if st.get('text-halo-radius', 0) != 0:
-                                dr_cur_subtext.stroke_color = mwm_encode_color(colors, sp, "text-halo", "white")
-                            if 'text-offset' in sp or 'text-offset-y' in sp:
-                                dr_cur_subtext.offset_y = int(sp.get('text-offset-y', sp.get('text-offset', 0)))
-                            elif 'text-offset-x' in sp:
-                                dr_cur_subtext.offset_x = int(sp.get('text-offset-x', 0))
-                            elif st.get('text-position', 'center') == 'center' and dr_element.symbol.priority:
-                                print(f'ERROR: an icon is present, but caption\'s text-offset is not set for z{zoom} {cl}')
-                                validation_errors_count += 1
-                            if 'text' in sp and sp.get('text') not in ('name', 'int_name'):
-                                dr_cur_subtext.text = sp.get('text')
-                            if 'text-optional' in sp:
-                                is_valid, value = to_boolean(sp.get('text-optional', ''))
-                                if is_valid:
-                                    dr_cur_subtext.is_optional = value
-                                else:
-                                    dr_cur_subtext.is_optional = True
-                            elif text_priority_key == 'caption' and dr_element.symbol.priority:
-                                # On by default for all captions (not path texts) with icons.
-                                dr_cur_subtext.is_optional = True
-                            dr_cur_subtext = dr_text.secondary
-
-                        auto_comment = None
-                        if text_priority_key == 'caption' and dr_element.symbol.priority:
-                            # A caption with an icon.
-                            # Mandatory captions use icon's priority.
-                            auto_prio_mod = 0
-                            auto_comment = 'mandatory'
-                            if dr_text.primary.is_optional:
-                                # Optional captions are automatically placed below most other overlays.
-                                auto_comment = 'optional'
-                                auto_prio_mod = -OVERLAYS_MAX_PRIORITY
-                            dr_text.priority = get_drape_priority(cl, 'icon', st.get('object-id'),
-                                                                  text_priority_key, auto_comment, auto_prio_mod)
-                        else:
-                            # A pathtext or a standalone caption.
-                            dr_text.priority = get_drape_priority(cl, text_priority_key, st.get('object-id'))
-
-                        store_visibility(cl, text_priority_key, st.get('object-id'), zoom, auto_comment)
-
-                        # Process captions block once.
-                        has_text = None
-
-                    if has_fills:
-                        if 'fill-color' in st and st.get('fill-color') != 'none' and float(st.get('fill-opacity', 1)) > 0:
-                            dr_element.area.color = mwm_encode_color(colors, st, "fill")
-                            dr_element.area.priority = get_drape_priority(cl, 'area', st.get('object-id'))
-                            store_visibility(cl, 'area', st.get('object-id'), zoom)
-                            has_fills = False
-
-                str_dr_element = dr_cont.name + "/" + str(dr_element)
-                if str_dr_element not in all_draw_elements:
-                    all_draw_elements.add(str_dr_element)
-                    dr_cont.element.extend([dr_element])
-
-    if dr_cont is not None:
-        if dr_cont.element:
-            drules.cont.extend([dr_cont])
-
-        visibility["world|" + class_tree[cl] + "|"] = "".join(visstring)
-
-    validate_visibilities(options.maxzoom)
-
-    if validation_errors_count:
-        print()
-        exit('FAILED to write regenerated drules files!\n'
-             f'There are {validation_errors_count} validation errors (see in the log above).\n'
-             'Fix all errors first and re-run.')
-
+    # Load priorities
+    logger.info("Loading priorities...")
     output = ''
     for prio_range in prio_ranges.keys():
-        dump_priorities(prio_range, options.priorities_path, options.maxzoom)
+        priority_mgr.load_priorities(prio_range, options.priorities_path, unique_types_check, compress=False)
         output += f'{"" if not output else ", "}{len(prio_ranges[prio_range]["priorities"])} {prio_range}'
-    print(f'Re-formated priorities files: {output}.')
+    logger.info(f'Loaded priorities: {output}')
 
-    # Write drules_proto.bin and drules_proto.txt files
+    del unique_types_check
 
-    drules_bin = open(os.path.join(options.outfile + '.bin'), "wb")
-    drules_bin.write(drules.SerializeToString())
-    drules_bin.close()
+    # Get tags
+    mapcss_static_tags = classificator_mgr.get_mapcss_static_tags()
+    mapcss_dynamic_tags = load_mapcss_dynamic_tags(ddir)
+    logger.debug(f"Loaded {len(mapcss_static_tags)} static tags, {len(mapcss_dynamic_tags)} dynamic tags")
+
+    # Parse MapCSS stylesheet
+    logger.info("Parsing MapCSS stylesheet...")
+    style = MapCSS(options.minzoom, options.maxzoom)
+    style.parse(clamp=False, stretch=LAYER_PRIORITY_RANGE,
+                filename=options.filename, static_tags=mapcss_static_tags,
+                dynamic_tags=mapcss_dynamic_tags)
+
+    # Build optimization tree
+    logger.info("Building optimization tree...")
+    clname_cltag_unique = set()
+    for cl in classificator_mgr.class_order:
+        clname = cl if cl.find('-') == -1 else cl[:cl.find('-')]
+        cltag = next(iter(classificator_mgr.classificator[cl].keys()))
+        clname_cltag = clname + '$' + cltag
+        if clname_cltag not in clname_cltag_unique:
+            clname_cltag_unique.add(clname_cltag)
+            style.build_choosers_tree(clname, "line", cltag)
+            style.build_choosers_tree(clname, "area", cltag)
+            style.build_choosers_tree(clname, "node", cltag)
+
+    style.finalize_choosers_tree()
+    logger.debug(f"Built optimization tree for {len(clname_cltag_unique)} type combinations")
+
+    if options.multiprocessing:
+        logger.debug("Multiprocessing: enabled")
+    else:
+        logger.info("Multiprocessing: disabled (running in single process mode)")
+
+    # Process styles and generate drules
+    logger.info("Processing styles...")
+    result = process_styles(
+        options, style, classificator_mgr, priority_mgr,
+        visibility_tracker, colors, add_pattern,
+        use_multiprocessing=options.multiprocessing
+    )
+    drules_data = result.drules_data
+    visibility = result.visibility
+    validation_errors = result.validation_errors
+
+    # Validate
+    visibility_tracker.validate_visibilities(options.maxzoom)
+
+    if validation_errors:
+        logger.error(f'FAILED to write regenerated drules files!')
+        logger.error(f'There are {validation_errors} validation errors (see in the log above).')
+        logger.error('Fix all errors first and re-run.')
+        exit(1)
+
+    # Dump priorities - reformats with zoom visibility comments
+    logger.info("Dumping priorities...")
+    output = ''
+    for prio_range in prio_ranges.keys():
+        priority_mgr.dump_priorities(prio_range, options.priorities_path, options.maxzoom,
+                                     visibility_tracker.get_visibilities())
+        output += f'{"" if not output else ", "}{len(prio_ranges[prio_range]["priorities"])} {prio_range}'
+    logger.info(f'Re-formatted priorities files: {output}')
+
+    # Serialize to protobuf (this is the ONLY place protobuf is used)
+    logger.info("Serializing to protobuf format...")
+    try:
+        serializer = DrulesSerializer()
+        drules_binary = serializer.serialize(drules_data)
+    except Exception as e:
+        logger.error(f"Failed to serialize drules to protobuf: {e}")
+        raise
+
+    # Write binary output
+    logger.info("Writing binary output...")
+    with open(os.path.join(options.outfile + '.bin'), "wb") as drules_bin:
+        drules_bin.write(drules_binary)
+    logger.debug(f"Wrote binary file: {options.outfile}.bin")
 
     if options.txt:
-        drules_txt = open(os.path.join(options.outfile + '.txt'), "wb")
-        drules_txt.write(str(drules).encode())
-        drules_txt.close()
+        logger.info("Writing text output...")
+        drules_text = serializer.serialize_to_text(drules_data)
+        with open(os.path.join(options.outfile + '.txt'), "w") as drules_txt:
+            drules_txt.write(drules_text)
+        logger.debug(f"Wrote text file: {options.outfile}.txt")
 
-    # Write classificator.txt and visibility.txt files
+    # Write visibility and classificator files
+    logger.info("Writing visibility files...")
+    file_io_mgr.save_visibility(visibility, options.maxzoom)
 
-    visnodes = set()
-    for k, v in visibility.items():
-        vis = k.split("|")
-        for i in range(1, len(vis) - 1):
-            visnodes.add("|".join(vis[0:i]) + "|")
-    viskeys = list(set(list(visibility.keys()) + list(visnodes)))
+    # Write colors and patterns
+    logger.info("Writing colors and patterns...")
+    file_io_mgr.save_colors(colors)
+    file_io_mgr.save_patterns(patterns)
+    logger.debug(f"Wrote {len(colors)} colors and {len(patterns)} patterns")
 
-    def cmprepl(a, b):
-        if a == b:
-            return 0
-        a = a.replace("|", "-")
-        b = b.replace("|", "-")
-        if a > b:
-            return 1
-        return -1
-    viskeys.sort(key=functools.cmp_to_key(cmprepl))
+    logger.info("Drules generation completed successfully!")
 
-    # TODO: Introduce new function to dump `visibility.txt` and `classificator.txt` for better testability
-    visibility_file = open(os.path.join(ddir, 'visibility.txt'), "w")
-    classificator_file = open(os.path.join(ddir, 'classificator.txt'), "w")
-
-    oldoffset = ""
-    for k in viskeys:
-        offset = "    " * (k.count("|") - 1)
-        for i in range(int(len(oldoffset) / 4), int(len(offset) / 4), -1):
-            print("    " * i + "{}", file=visibility_file)
-            print("    " * i + "{}", file=classificator_file)
-        oldoffset = offset
-        end = "-"
-        if k in visnodes:
-            end = "+"
-        print(offset + k.split("|")[-2] + "  " + visibility.get(k, "0" * (options.maxzoom + 1)) + "  " + end, file=visibility_file)
-        print(offset + k.split("|")[-2] + "  " + end, file=classificator_file)
-    for i in range(int(len(offset) / 4), 0, -1):
-        print("    " * i + "{}", file=visibility_file)
-        print("    " * i + "{}", file=classificator_file)
-
-    visibility_file.close()
-    classificator_file.close()
-
-    # TODO: Introduce new function to dump `colors.txt` for better testability
-    colors_file = open(colors_file_name, "w")
-    for c in sorted(colors):
-        colors_file.write("%d\n" % (c))
-    colors_file.close()
-
-    # TODO: Introduce new function to dump `patterns.txt` for better testability
-    patterns_file = open(patterns_file_name, "w")
-    for p in patterns:
-        patterns_file.write("%s\n" % (' '.join(str(elem) for elem in p)))
-    patterns_file.close()
-
-
-def main():
-    parser = OptionParser()
-    parser.add_option("-s", "--stylesheet", dest="filename",
-                      help="read MapCSS stylesheet from FILE", metavar="FILE")
-    parser.add_option("-f", "--minzoom", dest="minzoom", default=0, type="int",
-                      help="minimal available zoom level", metavar="ZOOM")
-    parser.add_option("-t", "--maxzoom", dest="maxzoom", default=20, type="int",
-                      help="maximal available zoom level", metavar="ZOOM")
-    parser.add_option("-o", "--output-file", dest="outfile", default="-",
-                      help="output filename", metavar="FILE")
-    parser.add_option("-x", "--txt", dest="txt", action="store_true",
-                      help="create a text file for output", default=False)
-    parser.add_option("-p", "--priorities-path", dest="priorities_path",
-                      help="path to priorities *.prio.txt files", metavar="PATH")
-    parser.add_option("-d", "--data-path", dest="data",
-                      help="path to mapcss-mapping.csv and other files", metavar="PATH")
-
-    (options, args) = parser.parse_args()
-
-    if (options.filename is None):
-        parser.error("MapCSS stylesheet filename is required")
-
-    if options.outfile == "-":
-        parser.error("Please specify base output path.")
-
-    if (options.priorities_path is None or not os.path.isdir(options.priorities_path)):
-        parser.error("A path to priorities *.prio.txt files is required.")
-    options.priorities_path = os.path.normpath(options.priorities_path)
-
-    komap_mapswithme(options)
 
 if __name__ == '__main__':
-    if PROFILE:
-        import cProfile
-        cProfile.run('main()', 'profile.tmp')
-        import pstats
-        p = pstats.Stats('profile.tmp')
-        p.sort_stats('cumulative').print_stats(10)
-    else:
-        main()
+    main()
