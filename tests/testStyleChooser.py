@@ -213,11 +213,11 @@ class StyleChooserTest(unittest.TestCase):
         sc = StyleChooser((15, 19))
 
         sc.newObject()
-        sc.addCondition(Condition("eq", ("::class", "::flats") )) # `sc` styles should apply only to `::flats` class
+        sc.addCondition(Condition("eq", ("::class", "::flats") ))
         sc.addCondition(parseCondition("oneway?"))
 
         sc.newObject()
-        sc.addCondition(Condition("eq", ("::class", "::bridgeblack") )) # This class is ignored by StyleChooser
+        sc.addCondition(Condition("eq", ("::class", "::bridgeblack") ))
         sc.addCondition(parseCondition("oneway?"))
 
         sc.addStyles([{
@@ -227,19 +227,22 @@ class StyleChooserTest(unittest.TestCase):
 
         object_tags = {"highway": "service", "oneway": "yes"}
 
-        # Apply new style to predefined styles with filter by class
+        # Apply new style to predefined styles. Both ::flats and ::bridgeblack
+        # selectors match (oneway=yes); body must be applied to each, leaving
+        # ::default — which has no matching ruleChain — alone.
         new_styles = sc.updateStyles(styles, object_tags, 1.0, 1.0, False)
 
-        expected_new_styles = [{ # The first style changes
+        expected_new_styles = [{
             "some-width": 1.5,
             "other-offset": 4.0,
             "object-id": "::flats"
         },
-        { # Style not changed (class is not `::flats`)
-            "some-width": 3.5,
+        {
+            "some-width": 1.5,
+            "other-offset": 4.0,
             "object-id": "::bridgeblack"
         },
-        { # Style not changed (class is not `::flats`)
+        { # No matching ruleChain for ::default
             "some-width": 4.5,
             "object-id": "::default"
         }]
@@ -290,6 +293,43 @@ class StyleChooserTest(unittest.TestCase):
     def test_runtime_conditions(self):
         # TODO: Create test with  sc.addRuntimeCondition(Condition(condType, ('extra_tag', cond)))
         pass
+
+    def test_update_styles_multi_object_id(self):
+        """Regression: one rule block with comma-separated selectors targeting
+        different ::object-id subparts must apply the body to every matching
+        subpart, not just the first one. Mirrors the real-world case of:
+            node|z16-[addr:housenumber][addr:street],
+            node|z16-[addr:housenumber][addr:street]::int_name,
+            {text: none;}
+        """
+        # Predefined styles already in the cascade — both ::default and
+        # ::int_name come in with a populated text field that we want to clear.
+        styles = [
+            {"text": "name", "object-id": "::default"},
+            {"text": "int_name", "object-id": "::int_name"},
+        ]
+
+        sc = StyleChooser((15, 19))
+
+        sc.newObject()
+        sc.addCondition(parseCondition("addr:housenumber"))
+        sc.addCondition(parseCondition("addr:street"))
+
+        sc.newObject()
+        sc.addCondition(parseCondition("addr:housenumber"))
+        sc.addCondition(parseCondition("addr:street"))
+        sc.addCondition(Condition("eq", ("::class", "::int_name")))
+
+        sc.addStyles([{"text": "none"}])
+
+        tags = {"addr:housenumber": "12", "addr:street": "Baker street"}
+        new_styles = sc.updateStyles(styles, tags, 1.0, 1.0, False)
+
+        by_oid = {s["object-id"]: s for s in new_styles}
+        self.assertEqual(by_oid["::default"]["text"], "none")
+        self.assertEqual(by_oid["::int_name"]["text"], "none",
+                         "::int_name body must be applied even though "
+                         "::default selector matches first")
 
 if __name__ == '__main__':
     unittest.main()
