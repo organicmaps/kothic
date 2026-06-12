@@ -1,3 +1,2 @@
-# The core is using protobuf 3.3.0 still (3party/protobuf/), so no point to require newer versions.
-# E.g. Ubuntu 24.04 LTS ships with python3-protobuf 3.21.12. But pypi.org have doesn't have 3.21 but only 3.20
-protobuf~=3.20.0
+# Generating Organic Maps drawing rules (libkomwm.py) needs no external Python packages:
+# the drawing-rules format is written by the pure-Python src/drules.py module.
