@@ -7,7 +7,9 @@ from sys import exit
 from multiprocessing import Pool, set_start_method
 from collections import OrderedDict
 import mapcss.webcolors
-from drules_struct_pb2 import BUTTCAP, ROUNDCAP, NOJOIN, BEVELJOIN, ROUNDJOIN, ContainerProto, ColorElementProto, ClassifElementProto, DrawElementProto, LineRuleProto
+from drules import (BEVELJOIN, BUTTCAP, NOJOIN, ROUNDCAP, ROUNDJOIN,
+                    ClassifElement, ColorElement, Container, DrawElement, LineRule,
+                    serialize_binary, serialize_text)
 
 whatever_to_hex = mapcss.webcolors.webcolors.whatever_to_hex
 whatever_to_cairo = mapcss.webcolors.webcolors.whatever_to_cairo
@@ -609,7 +611,7 @@ def komap_mapswithme(options):
 
     # Build drules tree
 
-    drules = ContainerProto()
+    drules = Container()
     dr_cont = None
     if MULTIPROCESSING:
         set_start_method('fork')  # Use fork with multiprocessing to share global variables among Python instances
@@ -620,12 +622,10 @@ def komap_mapswithme(options):
 
     if style_colors:
         for k, v in sorted(list(style_colors.items())):
-            color_proto = ColorElementProto()
-            color_proto.name = k
-            color_proto.color = v
-            color_proto.x = 0
-            color_proto.y = 0
-            drules.colors.value.extend([color_proto])
+            color_element = ColorElement()
+            color_element.name = k
+            color_element.color = v
+            drules.colors.value.extend([color_element])
 
     all_draw_elements = set()
 
@@ -661,7 +661,7 @@ def komap_mapswithme(options):
                     dr_cont = None
 
                 if dr_cont is None:
-                    dr_cont = ClassifElementProto()
+                    dr_cont = ClassifElement()
                     dr_cont.name = cl
 
                     visstring = ["0"] * (options.maxzoom - options.minzoom + 1)
@@ -676,7 +676,7 @@ def komap_mapswithme(options):
                     st = dict([(k, v) for k, v in st.items() if str(v).strip(" 0.")])
                     if 'width' in st or 'pattern-image' in st:
                         has_lines = True
-                    if 'icon-image' in st and st.get('icon-image') != 'none' or 'symbol-shape' in st or 'symbol-image' in st:
+                    if 'icon-image' in st and st.get('icon-image') != 'none' or 'symbol-image' in st:
                         has_icons = True
                     if 'fill-color' in st and st.get('fill-color') != 'none':
                         has_fills = True
@@ -698,7 +698,7 @@ def komap_mapswithme(options):
                 if zoom == 0:
                     continue
 
-                dr_element = DrawElementProto()
+                dr_element = DrawElement()
                 dr_element.scale = zoom
 
                 if runtime_conditions:
@@ -709,7 +709,7 @@ def komap_mapswithme(options):
                     if st.get('casing-width') not in (None, 0) or st.get('casing-width-add') is not None:  # and (st.get('width') or st.get('fill-color')):
                         is_area_st = 'fill-color' in st
                         if has_lines and not is_area_st and st.get('casing-linecap', 'butt') == 'butt':
-                            dr_line = LineRuleProto()
+                            dr_line = LineRule()
 
                             base_width = st.get('width', 0)
                             if base_width == 0:
@@ -745,21 +745,9 @@ def komap_mapswithme(options):
                             dr_element.area.border.color = mwm_encode_color(colors, st, "casing")
                             dr_element.area.border.width = st.get('casing-width', 0)
 
-                        # Let's try without this additional line style overhead. Needed only for casing in road endings.
-                        # if st.get('casing-linecap', st.get('linecap', 'round')) != 'butt':
-                        #     dr_line = LineRuleProto()
-                        #     dr_line.width = st.get('width', 0) + (st.get('casing-width') * 2)
-                        #     dr_line.color = mwm_encode_color(colors, st, "casing")
-                        #     dr_line.priority = -15000
-                        #     dashes = st.get('casing-dashes', st.get('dashes', []))
-                        #     dr_line.dashdot.dd.extend(dashes)
-                        #     dr_line.cap = dr_linecaps.get(st.get('casing-linecap', 'round'), ROUNDCAP)
-                        #     dr_line.join = dr_linejoins.get(st.get('casing-linejoin', 'round'), ROUNDJOIN)
-                        #     dr_element.lines.extend([dr_line])
-
                     if has_lines:
                         if st.get('width'):
-                            dr_line = LineRuleProto()
+                            dr_line = LineRule()
                             dr_line.width = st.get('width', 0)
                             dr_line.color = mwm_encode_color(colors, st)
                             for i in st.get('dashes', []):
@@ -771,7 +759,7 @@ def komap_mapswithme(options):
                             store_visibility(cl, 'line', st.get('object-id'), zoom)
                             dr_element.lines.extend([dr_line])
                         if st.get('pattern-image'):
-                            dr_line = LineRuleProto()
+                            dr_line = LineRule()
                             dr_line.width = 0
                             dr_line.color = 0
                             icon = mwm_encode_image(st, prefix='pattern')
@@ -803,13 +791,6 @@ def komap_mapswithme(options):
                             store_visibility(cl, 'icon', st.get('object-id'), zoom)
                             if 'icon-min-distance' in st:
                                 dr_element.symbol.min_distance = int(st.get('icon-min-distance', 0))
-                            has_icons = False
-                        if st.get('symbol-shape'):
-                            # TODO: not used in current styles; do "circles" work in drape at all?
-                            dr_element.circle.radius = float(st.get('symbol-size'))
-                            dr_element.circle.color = mwm_encode_color(colors, st, 'symbol-fill')
-                            dr_element.circle.priority = get_drape_priority(cl, 'circle', st.get('object-id'))
-                            store_visibility(cl, 'circle', st.get('object-id'), zoom)
                             has_icons = False
 
                     if has_text and st.get('text') and st.get('text') != 'none':
@@ -904,16 +885,16 @@ def komap_mapswithme(options):
         output += f'{"" if not output else ", "}{len(prio_ranges[prio_range]["priorities"])} {prio_range}'
     print(f'Re-formated priorities files: {output}.')
 
-    # Write drules_proto.bin and drules_proto.txt files
+    # Write the single-variant native drules file. The light/dark single-variant outputs are later
+    # packed into a family file (with a per-variant color palette) by merge_variants.py.
 
-    drules_bin = open(os.path.join(options.outfile + '.bin'), "wb")
-    drules_bin.write(drules.SerializeToString())
-    drules_bin.close()
+    variant = os.path.basename(options.outfile)
+    with open(options.outfile + '.bin', 'wb') as drules_bin:
+        drules_bin.write(serialize_binary([drules], [variant]))
 
     if options.txt:
-        drules_txt = open(os.path.join(options.outfile + '.txt'), "wb")
-        drules_txt.write(str(drules).encode())
-        drules_txt.close()
+        with open(options.outfile + '.txt', 'w', encoding='utf-8') as drules_txt:
+            drules_txt.write(serialize_text([drules], [variant]))
 
     # Write classificator.txt and visibility.txt files
 

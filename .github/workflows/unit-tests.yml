@@ -18,6 +18,6 @@ jobs:
           pip install -r requirements.txt
           pip install ruff
       - name: Lint code with Ruff
-        run: ruff check --exclude=src/drules_struct_pb2.py --output-format=github --target-version=py39
+        run: ruff check --output-format=github --target-version=py39
       - name: Run unit-tests
         run: python -m unittest discover -s tests
