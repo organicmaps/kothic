@@ -186,7 +186,7 @@ def query_style(args):
 def get_priorities_filename(prio_range, path):
     return os.path.join(path, f'priorities_{prio_ranges[prio_range]["pos"]}_{prio_range}.prio.txt')
 
-def load_priorities(prio_range, path, classif, compress = False):
+def load_priorities(prio_range:str, path:str, classif:set[str], compress:bool = False):
     def print_warning(msg):
         print(f'WARNING: {msg} in {fname}:\n\t{line}')
 
@@ -269,6 +269,104 @@ def load_priorities(prio_range, path, classif, compress = False):
             idx = unique_prios.index(prio_ranges[prio_range]['priorities'][prio_id])
             prio_ranges[prio_range]['priorities'][prio_id] = int(step * (base_idx + idx))
 
+def load_colors(file_path:str) -> set[int]:
+    colors = set()
+    if os.path.exists(file_path):
+        with open(file_path, "r") as colors_in_file:
+            for colorLine in colors_in_file:
+                if colorLine.strip():
+                    colors.add(int(colorLine.strip()))
+    return colors
+
+def save_colors(colors:set[int], file_path:str):
+    with open(file_path, "w") as colors_file:
+        for c in sorted(colors):
+            colors_file.write("%d\n" % c)
+
+def addPattern(patterns:list[list[float]], dashes: list[float]):
+    if dashes and dashes not in patterns:
+        patterns.append(dashes)
+
+def load_patterns(patterns_file_name:str) -> list[list[float]]:
+    patterns = []
+
+    if os.path.exists(patterns_file_name):
+        with open(patterns_file_name, "r") as patterns_in_file:
+            for patternsLine in patterns_in_file:
+                addPattern(patterns, [float(x) for x in patternsLine.split()])
+    return patterns
+
+def save_patterns(patterns: list[list[float]], patterns_file_name: str):
+    with open(patterns_file_name, "w") as patterns_file:
+        for p in patterns:
+            patterns_file.write("%s\n" % (' '.join(str(elem) for elem in p)))
+
+def load_mapcss_mapping(filename:str):
+    classificator:dict[str, OrderedDict] = {}
+    class_tree:dict[str, str] = {}
+    class_order:list[str] = []
+    types:list[str] = []
+
+    cnt = 1
+    unique_types_check = set()
+    with open(filename, "r") as mapping_file:
+        for row in csv.reader(mapping_file, delimiter=';'):
+            if len(row) <= 1 or row[0].startswith('#'):
+                # Allow for empty lines and comment lines starting with '#'.
+                continue
+            if len(row) == 3:
+                # Short format: type name, type id, x / replacement type name
+                tag = row[0].replace('|', '=')
+                obsolete = len(row[2].strip()) > 0
+                row = (row[0], '[{0}]'.format(tag), 'x' if obsolete else '', 'name', 'int_name', row[1], row[2] if row[2] != 'x' else '')
+            if len(row) != 7:
+                raise Exception('Expecting 3 or 7 columns in mapcss-mapping: {0}'.format(';'.join(row)))
+
+            if int(row[5]) < cnt:
+                raise Exception('Wrong type id: {0}'.format(';'.join(row)))
+            while int(row[5]) > cnt:
+                types.append("organicmaps")  # Placeholder
+                cnt += 1
+            cnt += 1
+
+            cl = row[0].replace("|", "-")
+            if cl in unique_types_check and row[2] != 'x':
+                raise Exception('Duplicate type: {0}'.format(row[0]))
+            # TODO: row[1] contains multiple tag=value combinations comma-separated.
+            #  E.g. "[leisure=swimming_pool][access=private],[amenity=swimming_pool][access=private]"
+            #  But only the first one "[leisure=swimming_pool][access=private]" is parsed here.
+            pairs = [i.strip(']').split("=") for i in row[1].split(',')[0].split('[')]
+            kv = OrderedDict()
+            for i in pairs:
+                if len(i) == 1:
+                    if i[0]:
+                        if i[0][0] == "!":
+                            kv[i[0][1:].strip('?')] = "no"
+                        else:
+                            kv[i[0].strip('?')] = "yes"
+                else:
+                    kv[i[0]] = i[1]
+            if row[2] != "x":
+                classificator[cl] = kv
+                class_order.append(cl)
+                unique_types_check.add(cl)
+                # Mark original type to distinguish it among replacing types.
+                types.append("*" + row[0])
+            else:
+                # compatibility mode
+                if row[6]:
+                    types.append(row[6])
+                else:
+                    types.append("organicmaps")  # Placeholder
+            class_tree[cl] = row[0]
+
+    class_order.sort()
+    return classificator, class_tree, class_order, types
+
+def save_types(types:list[str], types_filename:str):
+    with open(types_filename, "w") as types_file:
+        for tp in types:
+            types_file.write(tp + "\n")
 
 def store_visibility(cl, dr_type, object_id, zoom, auto_comment = None):
     if object_id == '::default':
@@ -467,97 +565,23 @@ def komap_mapswithme(options):
     else:
         ddir = os.path.dirname(options.outfile)
 
-    classificator = {}
-    class_order = []
-    class_tree = {}
 
-    # TODO: Introduce new function to parse `colors.txt` for better testability
     colors_file_name = os.path.join(ddir, 'colors.txt')
-    colors = set()
-    if os.path.exists(colors_file_name):
-        colors_in_file = open(colors_file_name, "r")
-        for colorLine in colors_in_file:
-            colors.add(int(colorLine))
-        colors_in_file.close()
-
-    # TODO: Introduce new function to parse `patterns.txt` for better testability
-    patterns = []
-    def addPattern(dashes):
-        if dashes and dashes not in patterns:
-            patterns.append(dashes)
+    colors:set[int] = load_colors(colors_file_name)
 
     patterns_file_name = os.path.join(ddir, 'patterns.txt')
-    if os.path.exists(patterns_file_name):
-        patterns_in_file = open(patterns_file_name, "r")
-        for patternsLine in patterns_in_file:
-            addPattern([float(x) for x in patternsLine.split()])
-        patterns_in_file.close()
+    patterns:list[list[float]] = load_patterns(patterns_file_name)
 
     # Build classificator tree from mapcss-mapping.csv file
-    types_file = open(os.path.join(ddir, 'types.txt'), "w")
-
     # The mapcss-mapping.csv format is described inside the file itself.
-    # TODO: introduce new function to parse 'mapcss-mapping.csv' for better testability
-    cnt = 1
-    unique_types_check = set()
-    mapping_file = open(os.path.join(ddir, 'mapcss-mapping.csv'))
-    for row in csv.reader(mapping_file, delimiter=';'):
-        if len(row) <= 1 or row[0].startswith('#'):
-            # Allow for empty lines and comment lines starting with '#'.
-            continue
-        if len(row) == 3:
-            # Short format: type name, type id, x / replacement type name
-            tag = row[0].replace('|', '=')
-            obsolete = len(row[2].strip()) > 0
-            row = (row[0], '[{0}]'.format(tag), 'x' if obsolete else '', 'name', 'int_name', row[1], row[2] if row[2] != 'x' else '')
-        if len(row) != 7:
-            raise Exception('Expecting 3 or 7 columns in mapcss-mapping: {0}'.format(';'.join(row)))
-
-        if int(row[5]) < cnt:
-            raise Exception('Wrong type id: {0}'.format(';'.join(row)))
-        while int(row[5]) > cnt:
-            print("mapswithme", file=types_file)
-            cnt += 1
-        cnt += 1
-
-        cl = row[0].replace("|", "-")
-        if cl in unique_types_check and row[2] != 'x':
-            raise Exception('Duplicate type: {0}'.format(row[0]))
-        pairs = [i.strip(']').split("=") for i in row[1].split(',')[0].split('[')]
-        kv = OrderedDict()
-        for i in pairs:
-            if len(i) == 1:
-                if i[0]:
-                    if i[0][0] == "!":
-                        kv[i[0][1:].strip('?')] = "no"
-                    else:
-                        kv[i[0].strip('?')] = "yes"
-            else:
-                kv[i[0]] = i[1]
-        if row[2] != "x":
-            classificator[cl] = kv
-            class_order.append(cl)
-            unique_types_check.add(cl)
-            # Mark original type to distinguish it among replacing types.
-            print("*" + row[0], file=types_file)
-        else:
-            # compatibility mode
-            if row[6]:
-                print(row[6], file=types_file)
-            else:
-                print("mapswithme", file=types_file)
-        class_tree[cl] = row[0]
-    class_order.sort()
-    mapping_file.close()
-    types_file.close()
+    classificator, class_tree, class_order, types = load_mapcss_mapping(os.path.join(ddir, 'mapcss-mapping.csv'))
+    save_types(types, os.path.join(ddir, 'types.txt'))
 
     output = ''
     for prio_range in prio_ranges.keys():
-        load_priorities(prio_range, options.priorities_path, unique_types_check, compress = False)
+        load_priorities(prio_range, options.priorities_path, set(class_order), compress = False)
         output += f'{"" if not output else ", "}{len(prio_ranges[prio_range]["priorities"])} {prio_range}'
     print(f'Loaded priorities: {output}.')
-
-    del unique_types_check
 
     # Get all mapcss static tags which are used in mapcss-mapping.csv
     # This is a dict with main_tag flags (True = appears first in types)
@@ -736,7 +760,7 @@ def komap_mapswithme(options):
                                 store_visibility(cl, 'line', st.get('object-id'), zoom)
                             for i in st.get('casing-dashes', st.get('dashes', [])):
                                 dr_line.dashdot.dd.extend([float(i)])
-                            addPattern(dr_line.dashdot.dd)
+                            addPattern(patterns, dr_line.dashdot.dd)
                             dr_line.cap = dr_linecaps.get(st.get('casing-linecap', 'butt'), BUTTCAP)
                             dr_line.join = dr_linejoins.get(st.get('casing-linejoin', 'round'), ROUNDJOIN)
                             dr_element.lines.extend([dr_line])
@@ -752,7 +776,7 @@ def komap_mapswithme(options):
                             dr_line.color = mwm_encode_color(colors, st)
                             for i in st.get('dashes', []):
                                 dr_line.dashdot.dd.extend([float(i)])
-                            addPattern(dr_line.dashdot.dd)
+                            addPattern(patterns, dr_line.dashdot.dd)
                             dr_line.cap = dr_linecaps.get(st.get('linecap', 'butt'), BUTTCAP)
                             dr_line.join = dr_linejoins.get(st.get('linejoin', 'round'), ROUNDJOIN)
                             dr_line.priority = get_drape_priority(cl, 'line', st.get('object-id'))
@@ -938,17 +962,11 @@ def komap_mapswithme(options):
     visibility_file.close()
     classificator_file.close()
 
-    # TODO: Introduce new function to dump `colors.txt` for better testability
-    colors_file = open(colors_file_name, "w")
-    for c in sorted(colors):
-        colors_file.write("%d\n" % (c))
-    colors_file.close()
+    # Save sorted colors
+    save_colors(colors, colors_file_name)
 
-    # TODO: Introduce new function to dump `patterns.txt` for better testability
-    patterns_file = open(patterns_file_name, "w")
-    for p in patterns:
-        patterns_file.write("%s\n" % (' '.join(str(elem) for elem in p)))
-    patterns_file.close()
+    # Save patterns with no duplicates
+    save_patterns(patterns, patterns_file_name)
 
 
 def main():

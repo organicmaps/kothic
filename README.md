@@ -29,9 +29,10 @@ Usage:
 
 ```shell
 cd integration-tests
-python3 full_drules_gen.py -d ../../../data -o drules --txt
+python3 full_drules_gen.py -d path-to/repo/organicmaps/data -o drules --txt
 ```
 
 This command will run generation for styles - default light, default dark,
 outdoors light, outdoors dark, vehicle light, vehicle dark and put `*.bin`
-and `*.txt` files into 'drules' subfolder.
+and `*.txt` files into 'drules' subfolder. The script also compares those
+files with baseline versions from main OrganicMaps repo.
