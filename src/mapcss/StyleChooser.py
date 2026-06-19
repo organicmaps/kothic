@@ -124,20 +124,29 @@ class StyleChooser:
 
     # TODO: Rename to "applyStyles"
     def updateStyles(self, sl, tags, xscale, zscale, filter_by_runtime_conditions):
-        # Are any of the ruleChains fulfilled?
-        rule_and_object_id = self.testChains(tags)
+        # A single rule block can have comma-separated selectors that target
+        # different ::object-id subparts, e.g.
+        #     node|z16-[addr:housenumber][addr:street],
+        #     node|z16-[addr:housenumber][addr:street]::int_name,
+        #     {text: none;}
+        # Apply the body to every matching subpart (deduped by object-id), not
+        # just the first one — otherwise the other selectors silently keep
+        # whatever values the cascade brought in from earlier choosers.
+        seen_object_ids = set()
+        for rule in self.ruleChains:
+            object_id = rule.test(tags)
+            if not object_id or object_id in seen_object_ids:
+                continue
+            if (filter_by_runtime_conditions is not None
+                and rule.runtime_conditions is not None
+                and filter_by_runtime_conditions != rule.runtime_conditions):
+                continue
+            seen_object_ids.add(object_id)
+            self._applyBodyToObjectId(sl, tags, xscale, zscale, object_id)
 
-        if not rule_and_object_id:
-            return sl
+        return sl
 
-        rule = rule_and_object_id[0]
-        object_id = rule_and_object_id[1]
-
-        if (filter_by_runtime_conditions is not None
-            and rule.runtime_conditions is not None
-            and filter_by_runtime_conditions != rule.runtime_conditions):
-            return sl
-
+    def _applyBodyToObjectId(self, sl, tags, xscale, zscale, object_id):
         for r in self.styles:
             if self.has_evals:
                 ra = {}
@@ -177,8 +186,6 @@ class StyleChooser:
                 if not hasall:
                     allinit.update(ra)
                     sl.append(allinit)
-
-        return sl
 
     def testChains(self, tags):
         """
