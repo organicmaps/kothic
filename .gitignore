@@ -1,8 +1,8 @@
-src/data/
-src/tiles/
+# Rust build artifacts
+/target
+
+# Editor / misc
 *~
-*.pyc
-*pycache*
 *swp
 *bak
 /.idea
