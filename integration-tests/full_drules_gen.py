@@ -16,14 +16,10 @@ logging.basicConfig(format=FORMAT)
 log = logging.getLogger('test_drules_gen')
 log.setLevel(logging.INFO)
 
-styles = {
-    'default_light':  ['styles/default/light/style.mapcss',  'styles/default/include'],
-    'default_dark':   ['styles/default/dark/style.mapcss',   'styles/default/include'],
-    'outdoors_light': ['styles/outdoors/light/style.mapcss', 'styles/outdoors/include'],
-    'outdoors_dark':  ['styles/outdoors/dark/style.mapcss',  'styles/outdoors/include'],
-    'vehicle_light':  ['styles/vehicle/light/style.mapcss',  'styles/vehicle/include'],
-    'vehicle_dark':   ['styles/vehicle/dark/style.mapcss',   'styles/vehicle/include'],
-}
+# Keep vehicle last: every style rewrites visibility.txt & classificator.txt in the data dir,
+# and the apps ship the ones produced by the vehicle style.
+STYLES = ('default', 'outdoors', 'cycling', 'vehicle')
+VARIANTS = ('light', 'dark')
 
 
 def full_styles_regenerate(options):
@@ -31,19 +27,21 @@ def full_styles_regenerate(options):
     libkomwm.MULTIPROCESSING = False
     prio_ranges_orig = deepcopy(libkomwm.prio_ranges)
 
-    for name, (style_path, include_path) in styles.items():
-        log.info(f"Generating {name} style ...")
+    for style in STYLES:
+        for variant in VARIANTS:
+            name = f'{style}_{variant}'
+            log.info(f"Generating {name} style ...")
 
-        # Restore initial state
-        libkomwm.prio_ranges = deepcopy(prio_ranges_orig)
-        libkomwm.visibilities = {}
+            # Restore initial state
+            libkomwm.prio_ranges = deepcopy(prio_ranges_orig)
+            libkomwm.visibilities = {}
 
-        options.filename = options.data + '/' + style_path
-        options.priorities_path = options.data + '/' + include_path
-        options.outfile = options.outdir + '/' + name
+            options.filename = f'{options.data}/styles/{style}/{variant}/style.mapcss'
+            options.priorities_path = f'{options.data}/styles/{style}/include'
+            options.outfile = f'{options.outdir}/{name}'
 
-        # Run generation
-        libkomwm.komap_mapswithme(options)
+            # Run generation
+            libkomwm.komap_mapswithme(options)
     log.info("Done!")
 
 def main():
