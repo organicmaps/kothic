@@ -1,0 +1,8 @@
+# Ruff's default rule selection widens between releases (0.16 added ~20 rule
+# groups, which flagged 280 pre-existing issues), turning CI red without a
+# single code change. Declare the set this repo enforces so that widening it
+# stays a deliberate decision.
+target-version = "py39"
+
+[lint]
+select = ["E4", "E7", "E9", "F"]
