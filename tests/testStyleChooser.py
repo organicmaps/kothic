@@ -213,11 +213,11 @@ class StyleChooserTest(unittest.TestCase):
         sc = StyleChooser((15, 19))
 
         sc.newObject()
-        sc.addCondition(Condition("eq", ("::class", "::flats") )) # `sc` styles should apply only to `::flats` class
+        sc.addCondition(Condition("eq", ("::class", "::flats") )) # `sc` styles apply to `::flats`
         sc.addCondition(parseCondition("oneway?"))
 
         sc.newObject()
-        sc.addCondition(Condition("eq", ("::class", "::bridgeblack") )) # This class is ignored by StyleChooser
+        sc.addCondition(Condition("eq", ("::class", "::bridgeblack") )) # ... and to `::bridgeblack`
         sc.addCondition(parseCondition("oneway?"))
 
         sc.addStyles([{
@@ -230,16 +230,17 @@ class StyleChooserTest(unittest.TestCase):
         # Apply new style to predefined styles with filter by class
         new_styles = sc.updateStyles(styles, object_tags, 1.0, 1.0, False)
 
-        expected_new_styles = [{ # The first style changes
+        expected_new_styles = [{ # Selected by the first rule
             "some-width": 1.5,
             "other-offset": 4.0,
             "object-id": "::flats"
         },
-        { # Style not changed (class is not `::flats`)
-            "some-width": 3.5,
+        { # Selected by the second rule
+            "some-width": 1.5,
+            "other-offset": 4.0,
             "object-id": "::bridgeblack"
         },
-        { # Style not changed (class is not `::flats`)
+        { # Style not changed (class is neither `::flats` nor `::bridgeblack`)
             "some-width": 4.5,
             "object-id": "::default"
         }]

@@ -125,14 +125,12 @@ class StyleChooser:
     # TODO: Rename to "applyStyles"
     def updateStyles(self, sl, tags, xscale, zscale, filter_by_runtime_conditions):
         # Are any of the ruleChains fulfilled?
-        rule_and_object_id = self.testChains(tags)
+        for rule, object_id in self.testChainsAll(tags):
+            self.applyStylesTo(sl, tags, xscale, zscale, filter_by_runtime_conditions, rule, object_id)
 
-        if not rule_and_object_id:
-            return sl
+        return sl
 
-        rule = rule_and_object_id[0]
-        object_id = rule_and_object_id[1]
-
+    def applyStylesTo(self, sl, tags, xscale, zscale, filter_by_runtime_conditions, rule, object_id):
         if (filter_by_runtime_conditions is not None
             and rule.runtime_conditions is not None
             and filter_by_runtime_conditions != rule.runtime_conditions):
@@ -179,6 +177,19 @@ class StyleChooser:
                     sl.append(allinit)
 
         return sl
+
+    def testChainsAll(self, tags):
+        """
+        Like testChains(), but yields the first matching rule for *each* distinct
+        ::object-id of the selector group, so that a declaration block applies to
+        every layer it selects instead of just the first one.
+        """
+        object_ids = set()
+        for r in self.ruleChains:
+            tt = r.test(tags)
+            if tt and tt not in object_ids:
+                object_ids.add(tt)
+                yield r, tt
 
     def testChains(self, tags):
         """
