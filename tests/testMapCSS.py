@@ -114,8 +114,7 @@ line|z7-9[highway=motorway],
         self.assertEqual(parser.choosers[0].selzooms, [6, 6])
         self.assertEqual(parser.choosers[1].selzooms, [7, 9])
 
-        rule, object_id = parser.choosers[0].testChains({"highway": "trunk"})
-        self.assertEqual(object_id, "::default")
+        self.assertEqual(parser.choosers[0].ruleChains[0].test({"highway": "trunk"}), "::default")
 
     def test_parse_basic_chooser_3(self):
         parser = MapCSS()
@@ -137,10 +136,9 @@ node|z18-[addr:housenumber][addr:street]::int_name
         styleChooser = parser.choosers[0]
         self.assertEqual(len(styleChooser.ruleChains), 1)
         self.assertEqual(styleChooser.selzooms, [18, 19])
-        rule, object_id = styleChooser.testChains(building_tags)
-        self.assertEqual(object_id, "::int_name")
 
         rule = styleChooser.ruleChains[0]
+        self.assertEqual(rule.test(building_tags), "::int_name")
         self.assertEqual(rule.subject, 'node')
         self.assertEqual(rule.extract_tags(), {'addr:housenumber', 'addr:street'})
 
@@ -158,10 +156,9 @@ way|z-13::*
         styleChooser = parser.choosers[0]
         self.assertEqual(len(styleChooser.ruleChains), 1)
         self.assertEqual(styleChooser.selzooms, [0, 13])
-        rule, object_id = styleChooser.testChains({})
-        self.assertEqual(object_id, "::*")
 
         rule = styleChooser.ruleChains[0]
+        self.assertEqual(rule.test({}), "::*")
         self.assertEqual(rule.subject, 'way')
         self.assertEqual(rule.extract_tags(), {'*'})
 
@@ -179,10 +176,9 @@ way|z10-::*
         styleChooser = parser.choosers[0]
         self.assertEqual(len(styleChooser.ruleChains), 1)
         self.assertEqual(styleChooser.selzooms, [10, 19])
-        rule, object_id = styleChooser.testChains({})
-        self.assertEqual(object_id, "::*")
 
         rule = styleChooser.ruleChains[0]
+        self.assertEqual(rule.test({}), "::*")
         self.assertEqual(rule.subject, 'way')
         self.assertEqual(rule.extract_tags(), {'*'})
 

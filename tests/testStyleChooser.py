@@ -23,15 +23,13 @@ class StyleChooserTest(unittest.TestCase):
         sc.addCondition(parseCondition("footway=crossing"))
         sc.addCondition(Condition("eq", ("::class", "::*")))
 
-        self.assertTrue( sc.testChains({ "highway": "footway", "footway": "sidewalk" }) )
-        self.assertTrue( sc.testChains({ "highway": "footway", "footway": "crossing" }) )
-        self.assertFalse( sc.testChains({ "highway": "footway"}) )
-        self.assertFalse( sc.testChains({ "highway": "residential", "footway": "crossing" }) )
+        self.assertEqual( list(sc.testChainsAll({ "highway": "footway" })), [] )
+        self.assertEqual( list(sc.testChainsAll({ "highway": "residential", "footway": "crossing" })), [] )
 
-        rule1, tt = sc.testChains({ "highway": "footway", "footway": "sidewalk" })
+        rule1, tt = next(sc.testChainsAll({ "highway": "footway", "footway": "sidewalk" }))
         self.assertEqual(tt, "::default")
 
-        rule2, tt = sc.testChains({ "highway": "footway", "footway": "crossing" })
+        rule2, tt = next(sc.testChainsAll({ "highway": "footway", "footway": "crossing" }))
         self.assertEqual(tt, "::*")
 
         self.assertNotEqual(rule1, rule2)
@@ -51,11 +49,11 @@ class StyleChooserTest(unittest.TestCase):
         sc.addCondition(parseCondition("transport=subway"))
         sc.addCondition(parseCondition("city=yokohama"))
 
-        rule1, tt = sc.testChains({ "railway": "station", "transport": "subway", "city": "yerevan" })
+        rule1, tt = next(sc.testChainsAll({ "railway": "station", "transport": "subway", "city": "yerevan" }))
         self.assertEqual(rule1.minZoom, 10)
         self.assertEqual(rule1.maxZoom, 19)
 
-        rule2, tt = sc.testChains({ "railway": "station", "transport": "subway", "city": "yokohama" })
+        rule2, tt = next(sc.testChainsAll({ "railway": "station", "transport": "subway", "city": "yokohama" }))
         self.assertEqual(rule2.minZoom, 4)
         self.assertEqual(rule2.maxZoom, 15)
 
@@ -289,8 +287,31 @@ class StyleChooserTest(unittest.TestCase):
 
 
     def test_runtime_conditions(self):
-        # TODO: Create test with  sc.addRuntimeCondition(Condition(condType, ('extra_tag', cond)))
-        pass
+        # libkomwm builds one drule variant per reported condition set, so every
+        # selected `::object-id` must report its own: the styles of an object-id
+        # left out are dropped by the filter_by_runtime_conditions check.
+        sc = StyleChooser((4, 19))
+
+        sc.newObject()
+        sc.addCondition(Condition("eq", ("::class", "::default")))
+        sc.addCondition(parseCondition("place=city"))
+        sc.addRuntimeCondition(parseCondition("population>=1000"))
+
+        sc.newObject()
+        sc.addCondition(Condition("eq", ("::class", "::int_name")))
+        sc.addCondition(parseCondition("place=city"))
+        sc.addRuntimeCondition(parseCondition("population>=500"))
+
+        object_tags = {"place": "city"}
+
+        self.assertEqual([[str(c) for c in rc] for rc in sc.get_runtime_conditions(object_tags)],
+                         [["population>=1000"], ["population>=500"]])
+
+        # A chooser without runtime conditions reports none.
+        sc_plain = StyleChooser((4, 19))
+        sc_plain.newObject()
+        sc_plain.addCondition(parseCondition("place=city"))
+        self.assertEqual(sc_plain.get_runtime_conditions(object_tags), [])
 
 if __name__ == '__main__':
     unittest.main()
