@@ -164,9 +164,7 @@ class MapCSS():
         runtime_rules = []
         if type in self.choosers_by_type_zoom_tag:
             for chooser in self.choosers_by_type_zoom_tag[type][zoom][clname]:
-                runtime_conditions = chooser.get_runtime_conditions(tags)
-                if runtime_conditions:
-                    runtime_rules.append(runtime_conditions)
+                runtime_rules.extend(chooser.get_runtime_conditions(tags))
         return runtime_rules
 
     # TODO: Renamed to `get_styles` because it returns a list of styles for each class `::XXX`

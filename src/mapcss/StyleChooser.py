@@ -110,17 +110,13 @@ class StyleChooser:
         return a
 
     def get_runtime_conditions(self, tags):
+        """
+        Returns the runtime conditions of every ::object-id this chooser selects,
+        to match the testChainsAll() contract used by updateStyles().
+        """
         if not self.has_runtime_conditions:
-            return None
-
-        rule_and_object_id = self.testChains(tags)
-
-        if not rule_and_object_id:
-            return None
-
-        rule = rule_and_object_id[0]
-
-        return rule.runtime_conditions
+            return []
+        return [rule.runtime_conditions for rule, _ in self.testChainsAll(tags) if rule.runtime_conditions]
 
     # TODO: Rename to "applyStyles"
     def updateStyles(self, sl, tags, xscale, zscale, filter_by_runtime_conditions):
@@ -180,9 +176,9 @@ class StyleChooser:
 
     def testChainsAll(self, tags):
         """
-        Like testChains(), but yields the first matching rule for *each* distinct
-        ::object-id of the selector group, so that a declaration block applies to
-        every layer it selects instead of just the first one.
+        Yields the first matching rule for *each* distinct ::object-id of the
+        selector group, so that a declaration block applies to every layer it
+        selects instead of just the first one.
         """
         object_ids = set()
         for r in self.ruleChains:
@@ -190,16 +186,6 @@ class StyleChooser:
             if tt and tt not in object_ids:
                 object_ids.add(tt)
                 yield r, tt
-
-    def testChains(self, tags):
-        """
-        Tests an object against a chain
-        """
-        for r in self.ruleChains:
-            tt = r.test(tags)
-            if tt:
-                return r, tt
-        return False
 
     def newGroup(self):
         """
