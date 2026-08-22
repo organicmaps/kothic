@@ -1,2 +1,0 @@
-# Generating Organic Maps drawing rules (libkomwm.py) needs no external Python packages:
-# the drawing-rules format is written by the pure-Python src/drules.py module.

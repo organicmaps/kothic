@@ -1,0 +1,36 @@
+[package]
+name = "kothic"
+version = "0.1.0"
+edition = "2024"
+description = "Kothic MapCSS parser/processor tailored for Organic Maps use."
+license = "GPL-3.0"
+
+[lib]
+name = "kothic"
+path = "src/lib.rs"
+
+[[bin]]
+name = "kothic"
+path = "src/bin/kothic.rs"
+
+[[bin]]
+name = "gen_all"
+path = "src/bin/gen_all.rs"
+
+[[bin]]
+name = "merge_variants"
+path = "src/bin/merge_variants.rs"
+
+[[bin]]
+name = "merge_styles"
+path = "src/bin/merge_styles.rs"
+
+[dependencies]
+regex = "1"
+md-5 = "0.10"
+clap = { version = "4", features = ["derive"] }
+indexmap = "2"
+paste = "1"
+
+[profile.release]
+lto = true
