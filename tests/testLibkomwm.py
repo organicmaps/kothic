@@ -65,6 +65,33 @@ class LibKomwmTest(unittest.TestCase):
             self.assertEqual(len(container.cont), 20,
                              "Generated style_output.bin should contain 20 types with drawing rules")
 
+            def lines_at(type_name, zoom):
+                classif = next(c for c in container.cont if c.name == type_name)
+                return next(e for e in classif.element if e.scale == zoom).lines
+
+            def element_at(type_name, zoom):
+                classif = next(c for c in container.cont if c.name == type_name)
+                return next(e for e in classif.element if e.scale == zoom)
+
+            # A zero font size suppresses an inherited shield instead of emitting a zero-height
+            # element for the renderer to discard.
+            self.assertFalse(element_at("highway-motorway", 10).shield._is_set())
+            self.assertEqual(element_at("highway-trunk", 10).shield.height, 9)
+
+            # An automatic casing is rendered below its line (priority - 1), keeps its own
+            # linecap and is 2 * casing-width wider than the line. Both casing rules in
+            # include/Roads.mapcss use a width of 1.
+            casing, line = lines_at("highway-world_level", 4)
+            self.assertEqual((line.cap, line.priority), (drules.BUTTCAP, 310))
+            self.assertEqual((casing.cap, casing.priority), (drules.ROUNDCAP, 309))
+            self.assertAlmostEqual(casing.width, line.width + 2, places=5)
+
+            # 'casing-width-add' widens the line first, so the casing is 2 * (width + add).
+            # It must be resolved even when the line carries its own width.
+            casing, line = lines_at("highway-world_towns_level", 6)
+            self.assertEqual(casing.priority, line.priority - 1)
+            self.assertAlmostEqual(casing.width, (line.width + 1) * 2, places=5)
+
         finally:
             # Clean up generated files
             files2delete = ["classificator.txt", "colors.txt", "patterns.txt", "style_output.bin",
