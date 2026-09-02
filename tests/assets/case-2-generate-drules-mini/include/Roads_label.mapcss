@@ -73,3 +73,6 @@ line|z10-[highway=secondary],
 line|z10-[highway=secondary],
 {font-size: 10; text-color: @label_light; text-halo-opacity: 0.7;}
 
+/* Zero suppresses an inherited shield in an override style. */
+line|z10[highway=motorway]::shield,
+{shield-font-size: 0;}

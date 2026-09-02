@@ -7,7 +7,7 @@ from sys import exit
 from multiprocessing import Pool, set_start_method
 from collections import OrderedDict
 import mapcss.webcolors
-from drules import (BEVELJOIN, BUTTCAP, NOJOIN, ROUNDCAP, ROUNDJOIN,
+from drules import (BEVELJOIN, BUTTCAP, NOJOIN, ROUNDCAP, ROUNDJOIN, SQUARECAP,
                     ClassifElement, ColorElement, Container, DrawElement, LineRule,
                     serialize_binary, serialize_text)
 
@@ -434,6 +434,16 @@ def dump_priorities(prio_range, path, maxzoom):
 
             outfile.write(f'{group}{group_comment}=== {group_prio}\n')
 
+def get_line_style(values, st, key, default, cl, zoom):
+    """Maps a MapCSS linecap/linejoin value onto its drules constant."""
+    value = st.get(key, default)
+    if value not in values:
+        print(f'ERROR: unsupported {key} value "{value}" for z{zoom} {cl}')
+        global validation_errors_count
+        validation_errors_count += 1
+        value = default
+    return values[value]
+
 def get_drape_priority(cl, dr_type, object_id, auto_dr_type = None, auto_comment = None, auto_prio_mod = 0):
     if object_id == '::default':
         object_id = ''
@@ -606,7 +616,7 @@ def komap_mapswithme(options):
 
     visibility = {}
 
-    dr_linecaps = {'none': BUTTCAP, 'butt': BUTTCAP, 'round': ROUNDCAP}
+    dr_linecaps = {'none': BUTTCAP, 'butt': BUTTCAP, 'round': ROUNDCAP, 'square': SQUARECAP}
     dr_linejoins = {'none': NOJOIN, 'bevel': BEVELJOIN, 'round': ROUNDJOIN}
 
     # Build drules tree
@@ -708,7 +718,7 @@ def komap_mapswithme(options):
                 for st in zstyle:
                     if st.get('casing-width') not in (None, 0) or st.get('casing-width-add') is not None:  # and (st.get('width') or st.get('fill-color')):
                         is_area_st = 'fill-color' in st
-                        if has_lines and not is_area_st and st.get('casing-linecap', 'butt') == 'butt':
+                        if has_lines and not is_area_st:
                             dr_line = LineRule()
 
                             base_width = st.get('width', 0)
@@ -718,10 +728,10 @@ def komap_mapswithme(options):
                                         # Rail bridge styles use width from ::dash object instead of ::default.
                                         if base_width == 0 or wst.get('object-id') != '::default':
                                             base_width = wst.get('width', 0)
-                                # 'casing-width' has precedence over 'casing-width-add'.
-                                if st.get('casing-width') in (None, 0):
-                                    st['casing-width'] = base_width + st.get('casing-width-add')
-                                    base_width = 0
+                            # 'casing-width' has precedence over 'casing-width-add'.
+                            if st.get('casing-width') in (None, 0):
+                                st['casing-width'] = base_width + st.get('casing-width-add')
+                                base_width = 0
 
                             dr_line.width = round(base_width + st.get('casing-width') * 2, 2)
                             dr_line.color = mwm_encode_color(colors, st, "casing")
@@ -737,8 +747,8 @@ def komap_mapswithme(options):
                             for i in st.get('casing-dashes', st.get('dashes', [])):
                                 dr_line.dashdot.dd.extend([float(i)])
                             addPattern(dr_line.dashdot.dd)
-                            dr_line.cap = dr_linecaps.get(st.get('casing-linecap', 'butt'), BUTTCAP)
-                            dr_line.join = dr_linejoins.get(st.get('casing-linejoin', 'round'), ROUNDJOIN)
+                            dr_line.cap = get_line_style(dr_linecaps, st, 'casing-linecap', 'butt', cl, zoom)
+                            dr_line.join = get_line_style(dr_linejoins, st, 'casing-linejoin', 'round', cl, zoom)
                             dr_element.lines.extend([dr_line])
 
                         if has_fills and is_area_st and float(st.get('fill-opacity', 1)) > 0:
@@ -753,8 +763,8 @@ def komap_mapswithme(options):
                             for i in st.get('dashes', []):
                                 dr_line.dashdot.dd.extend([float(i)])
                             addPattern(dr_line.dashdot.dd)
-                            dr_line.cap = dr_linecaps.get(st.get('linecap', 'butt'), BUTTCAP)
-                            dr_line.join = dr_linejoins.get(st.get('linejoin', 'round'), ROUNDJOIN)
+                            dr_line.cap = get_line_style(dr_linecaps, st, 'linecap', 'butt', cl, zoom)
+                            dr_line.join = get_line_style(dr_linejoins, st, 'linejoin', 'round', cl, zoom)
                             dr_line.priority = get_drape_priority(cl, 'line', st.get('object-id'))
                             store_visibility(cl, 'line', st.get('object-id'), zoom)
                             dr_element.lines.extend([dr_line])
@@ -770,8 +780,12 @@ def komap_mapswithme(options):
                             store_visibility(cl, 'line', st.get('object-id'), zoom)
                             dr_element.lines.extend([dr_line])
 
-                    if st.get('shield-font-size'):
-                        dr_element.shield.height = int(st.get('shield-font-size', 10))
+                    shield_font_size = int(st.get('shield-font-size', 0))
+                    if shield_font_size < 0:
+                        print(f'ERROR: negative shield-font-size {shield_font_size} for z{zoom} {cl}')
+                        validation_errors_count += 1
+                    elif shield_font_size > 0:
+                        dr_element.shield.height = shield_font_size
                         dr_element.shield.text_color = mwm_encode_color(colors, st, "shield-text")
                         if st.get('shield-text-halo-radius', 0) != 0:
                             dr_element.shield.text_stroke_color = mwm_encode_color(colors, st, "shield-text-halo", "white")
