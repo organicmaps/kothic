@@ -134,3 +134,12 @@ line|z10[highway=secondary],
 line|z10[highway=secondary],
 {width: 1.2;}
 
+/* Automatic (::default) casings, exercised by testLibkomwm:
+   any casing-linecap is honoured, and casing-width-add is resolved
+   even when the line carries its own width. */
+
+line|z4-9[highway=world_level],
+{casing-width: 1; casing-color: #FF0000; casing-linecap: round;}
+
+line|z6-9[highway=world_towns_level],
+{casing-width-add: 1; casing-color: #00FF00;}
