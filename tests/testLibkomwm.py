@@ -12,6 +12,19 @@ from libkomwm import komap_mapswithme
 
 
 class LibKomwmTest(unittest.TestCase):
+    def test_get_type_tags(self):
+        def items(selectors):
+            # The order matters: the first tag is the type's main one.
+            return list(libkomwm.get_type_tags(selectors).items())
+
+        self.assertEqual(items('[highway=primary][bridge?]'), [('highway', 'primary'), ('bridge', 'yes')])
+        # Only the first selector counts.
+        self.assertEqual(items('[amenity=parking][fee],[amenity=parking][parking=lane]'),
+                         [('amenity', 'parking'), ('fee', 'yes')])
+        # A forbidden key is absent, so that MapCSS [!tunnel] matches the type.
+        self.assertEqual(items('[natural=water][intermittent=yes][!tunnel]'),
+                         [('natural', 'water'), ('intermittent', 'yes')])
+
     def test_generate_drules_mini(self):
         assets_dir = Path(__file__).parent / 'assets' / 'case-2-generate-drules-mini'
 
