@@ -94,6 +94,29 @@ class DrulesTest(unittest.TestCase):
         self.assertEqual([element.scale for element in merged.cont[0].element], [5, 7])
         self.assertEqual([element.lines[0].width for element in merged.cont[0].element], [2.0, 4.0])
 
+    def test_serialize_text_inlines_colors(self):
+        light = _make_container(("highway-primary", [_make_element(10, 2.0)]))
+        dark = _make_container(("highway-primary", [_make_element(10, 2.0)]))
+        dark.cont[0].element[0].lines[0].color = 0xFF0A0B0C
+
+        text = drules.serialize_text([light, dark], ["light", "dark"])
+
+        self.assertIn("  base #FF010203", text.splitlines())  # The same value in both variants.
+        self.assertIn(" color=#FF010203/#FF0A0B0C ", text)
+
+    def test_serialize_text_keeps_other_lines_when_a_color_is_added(self):
+        base = _make_container(("highway-primary", [_make_element(10, 2.0)]))
+        extended = _make_container(("highway-primary", [_make_element(10, 2.0)]))
+        extra = drules.ColorElement()
+        extra.name = "extra"
+        extra.color = 0xFF112233
+        extended.colors.value.insert(0, extra)
+
+        lines = drules.serialize_text([base], ["light"]).splitlines()
+        extended_lines = drules.serialize_text([extended], ["light"]).splitlines()
+
+        self.assertEqual([line for line in extended_lines if "extra" not in line], lines)
+
 
 if __name__ == '__main__':
     unittest.main()
