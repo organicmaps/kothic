@@ -460,6 +460,26 @@ def get_drape_priority(cl, dr_type, object_id, auto_dr_type = None, auto_comment
     return 0
 
 
+def get_type_tags(selectors):
+    """Returns the tags that styles are evaluated against for a classificator type: the tags of the first
+    selector of its mapcss-mapping.csv row, e.g. '[highway=primary][bridge?]' -> {highway: primary, bridge: yes}.
+    The order matters, the first tag is the type's main one.
+    A forbidden '[!key]' is left out rather than set to "no", which MapCSS '[key]' would treat as set. So a key
+    that occurs only in such conditions is not a static tag, and styles can't test it (an "Unknown tag" error).
+    """
+    tags = OrderedDict()
+    # Only the first selector: the others are alternative OSM spellings of the same type, e.g.
+    # "[natural=water][intermittent=yes],[natural=water][seasonal?]", while the style has to be evaluated
+    # against one canonical set of tags. So a style can't test a key that only a later selector carries:
+    # such a condition is false if another type makes that key a static tag, and an "Unknown tag" error if not.
+    # TODO: revisit - either take the tags of every selector into account, or validate styles against them.
+    for cond in selectors.split(',')[0].split('['):
+        key, eq, value = cond.strip(']').partition('=')
+        if key and not key.startswith('!'):
+            tags[key.rstrip('?')] = value if eq else 'yes'
+    return tags
+
+
 # TODO: Split large function to smaller ones
 def komap_mapswithme(options):
     if options.data and os.path.isdir(options.data):
@@ -523,19 +543,8 @@ def komap_mapswithme(options):
         cl = row[0].replace("|", "-")
         if cl in unique_types_check and row[2] != 'x':
             raise Exception('Duplicate type: {0}'.format(row[0]))
-        pairs = [i.strip(']').split("=") for i in row[1].split(',')[0].split('[')]
-        kv = OrderedDict()
-        for i in pairs:
-            if len(i) == 1:
-                if i[0]:
-                    if i[0][0] == "!":
-                        kv[i[0][1:].strip('?')] = "no"
-                    else:
-                        kv[i[0].strip('?')] = "yes"
-            else:
-                kv[i[0]] = i[1]
         if row[2] != "x":
-            classificator[cl] = kv
+            classificator[cl] = get_type_tags(row[1])
             class_order.append(cl)
             unique_types_check.add(cl)
             # Mark original type to distinguish it among replacing types.
