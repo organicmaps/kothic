@@ -22,7 +22,7 @@ and execute tests from those files.
 ## Running integration tests
 
 File `integration-tests/full_drules_gen.py` is intended to generate drules
-files for all 6 themes from main Organic Maps repo. It could be used to understand
+files for all 8 themes from main Organic Maps repo. It could be used to understand
 which parts of the project are actually used by Organic Maps repo.
 
 Usage:
@@ -33,5 +33,5 @@ python3 full_drules_gen.py -d ../../../data -o drules --txt
 ```
 
 This command will run generation for styles - default light, default dark,
-outdoors light, outdoors dark, vehicle light, vehicle dark and put `*.bin`
-and `*.txt` files into 'drules' subfolder.
+outdoors light, outdoors dark, cycling light, cycling dark, vehicle light,
+vehicle dark and put `*.bin` and `*.txt` files into 'drules' subfolder.
