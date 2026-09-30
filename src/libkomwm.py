@@ -66,8 +66,7 @@ BG-top geometry: background lines and areas that should be always below foregrou
 because ordering by size doesn't always work with e.g. water mapped over a forest,
 so water should be on top of other landcover always, but linear waterways should be hidden beneath it.
 Still, e.g. a layer=-1 BG-top feature will be rendered under a layer=0 BG-by-size feature
-(so areal water tunnels are hidden beneath other landcover area) and a layer=1 landcover areas
-are displayed above layer=0 BG-top.
+and layer=1 landcover areas are displayed above layer=0 BG-top.
 '''
 prio_ranges[PRIO_BG_BY_SIZE]['comment'] = '''
 BG-by-size geometry: background areas rendered below BG-top and everything else.
