@@ -71,8 +71,8 @@ and layer=1 landcover areas are displayed above layer=0 BG-top.
 prio_ranges[PRIO_BG_BY_SIZE]['comment'] = '''
 BG-by-size geometry: background areas rendered below BG-top and everything else.
 Smaller areas are rendered above larger ones (area's size is estimated as the size of its' bounding box).
-So effectively priority values of BG-by-size areas are not used at the moment.
-But we might use them later for some special cases, e.g. to determine a main area type of a multi-type feature.
+Priorities select the fill of features carrying multiple area types. They do not change
+the bbox-based drawing order between separate features.
 Keep them in a logical importance order please.
 '''
 
