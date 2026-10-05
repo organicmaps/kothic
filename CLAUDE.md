@@ -95,7 +95,8 @@ Maps-specific compiler) → `src/drules.py` (native format) → merge tools.
   structurally identical except for the four color fields (`color`, `stroke_color`, `text_color`,
   `text_stroke_color`) — `serialize_binary` raises `ValueError` otherwise.
 - `serialize_text` produces the canonical, deterministic text dump (all variants side by side)
-  used to review style changes in the main repo.
+  used to review style changes in the main repo. Colors are written by value, so adding or removing
+  a color doesn't renumber the whole dump.
 
 ### Merge tools
 
