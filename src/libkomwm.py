@@ -4,7 +4,7 @@ import os
 import csv
 import functools
 from sys import exit
-from multiprocessing import Pool, set_start_method
+from multiprocessing import get_all_start_methods, get_context
 from collections import OrderedDict
 import mapcss.webcolors
 from drules import (BEVELJOIN, BUTTCAP, NOJOIN, ROUNDCAP, ROUNDJOIN,
@@ -192,7 +192,7 @@ def load_priorities(prio_range, path, classif, compress = False):
     priority_max = OVERLAYS_MAX_PRIORITY if prio_range == PRIO_OVERLAYS else LAYER_PRIORITY_RANGE
     priority_min = -OVERLAYS_MAX_PRIORITY if prio_range == PRIO_OVERLAYS else 0
     fname = get_priorities_filename(prio_range, path)
-    with open(fname, 'r') as f:
+    with open(fname, 'r', encoding='utf-8') as f:
         group = []
         for line in f:
             line = line.strip()
@@ -346,7 +346,7 @@ def validate_visibilities(maxzoom):
                         validation_errors_count += 1
 
 def dump_priorities(prio_range, path, maxzoom):
-    with open(get_priorities_filename(prio_range, path), 'w') as outfile:
+    with open(get_priorities_filename(prio_range, path), 'w', encoding='utf-8') as outfile:
         comment = COMMENT_AUTOFORMAT + prio_ranges[prio_range]['comment'] + COMMENT_RANGES_OVERVIEW
         for s in comment.splitlines():
             outfile.write(f'# {s}'.rstrip() + '\n')
@@ -494,7 +494,7 @@ def komap_mapswithme(options):
     colors_file_name = os.path.join(ddir, 'colors.txt')
     colors = set()
     if os.path.exists(colors_file_name):
-        colors_in_file = open(colors_file_name, "r")
+        colors_in_file = open(colors_file_name, "r", encoding='utf-8')
         for colorLine in colors_in_file:
             colors.add(int(colorLine))
         colors_in_file.close()
@@ -507,19 +507,19 @@ def komap_mapswithme(options):
 
     patterns_file_name = os.path.join(ddir, 'patterns.txt')
     if os.path.exists(patterns_file_name):
-        patterns_in_file = open(patterns_file_name, "r")
+        patterns_in_file = open(patterns_file_name, "r", encoding='utf-8')
         for patternsLine in patterns_in_file:
             addPattern([float(x) for x in patternsLine.split()])
         patterns_in_file.close()
 
     # Build classificator tree from mapcss-mapping.csv file
-    types_file = open(os.path.join(ddir, 'types.txt'), "w")
+    types_file = open(os.path.join(ddir, 'types.txt'), "w", encoding='utf-8')
 
     # The mapcss-mapping.csv format is described inside the file itself.
     # TODO: introduce new function to parse 'mapcss-mapping.csv' for better testability
     cnt = 1
     unique_types_check = set()
-    mapping_file = open(os.path.join(ddir, 'mapcss-mapping.csv'))
+    mapping_file = open(os.path.join(ddir, 'mapcss-mapping.csv'), encoding='utf-8')
     for row in csv.reader(mapping_file, delimiter=';'):
         if len(row) <= 1 or row[0].startswith('#'):
             # Allow for empty lines and comment lines starting with '#'.
@@ -576,7 +576,7 @@ def komap_mapswithme(options):
 
     # TODO: Introduce new function to parse `mapcss-dynamic.txt` for better testability
     # Get all mapcss dynamic tags from mapcss-dynamic.txt
-    with open(os.path.join(ddir, 'mapcss-dynamic.txt')) as dynamic_file:
+    with open(os.path.join(ddir, 'mapcss-dynamic.txt'), encoding='utf-8') as dynamic_file:
         mapcss_dynamic_tags = set([line.rstrip() for line in dynamic_file])
 
     # Parse style mapcss
@@ -621,9 +621,9 @@ def komap_mapswithme(options):
 
     drules = Container()
     dr_cont = None
-    if MULTIPROCESSING:
-        set_start_method('fork')  # Use fork with multiprocessing to share global variables among Python instances
-        pool = Pool()
+    # Fork shares the parsed style globals; use serial evaluation where fork is unavailable.
+    if MULTIPROCESSING and 'fork' in get_all_start_methods():
+        pool = get_context('fork').Pool()
         imapfunc = pool.imap
     else:
         imapfunc = map
@@ -924,8 +924,8 @@ def komap_mapswithme(options):
     viskeys.sort(key=functools.cmp_to_key(cmprepl))
 
     # TODO: Introduce new function to dump `visibility.txt` and `classificator.txt` for better testability
-    visibility_file = open(os.path.join(ddir, 'visibility.txt'), "w")
-    classificator_file = open(os.path.join(ddir, 'classificator.txt'), "w")
+    visibility_file = open(os.path.join(ddir, 'visibility.txt'), "w", encoding='utf-8')
+    classificator_file = open(os.path.join(ddir, 'classificator.txt'), "w", encoding='utf-8')
 
     oldoffset = ""
     for k in viskeys:
@@ -947,13 +947,13 @@ def komap_mapswithme(options):
     classificator_file.close()
 
     # TODO: Introduce new function to dump `colors.txt` for better testability
-    colors_file = open(colors_file_name, "w")
+    colors_file = open(colors_file_name, "w", encoding='utf-8')
     for c in sorted(colors):
         colors_file.write("%d\n" % (c))
     colors_file.close()
 
     # TODO: Introduce new function to dump `patterns.txt` for better testability
-    patterns_file = open(patterns_file_name, "w")
+    patterns_file = open(patterns_file_name, "w", encoding='utf-8')
     for p in patterns:
         patterns_file.write("%s\n" % (' '.join(str(elem) for elem in p)))
     patterns_file.close()

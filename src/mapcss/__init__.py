@@ -227,7 +227,7 @@ class MapCSS():
         if filename:
             basepath = os.path.dirname(filename)
         if not css:
-            with open(filename) as css_file:
+            with open(filename, encoding='utf-8') as css_file:
                 css = css_file.read()
         if not self.style_loaded:
             self.choosers = []
@@ -348,7 +348,7 @@ class MapCSS():
                         import_filename = os.path.join(basepath, IMPORT.match(css).groups()[0])
                         try:
                             css = IMPORT.sub("", css, 1)
-                            with open(import_filename, "r") as import_file:
+                            with open(import_filename, "r", encoding='utf-8') as import_file:
                                 import_text = import_file.read()
                             stck[-1][1] = css # store remained part
                             stck.append([import_filename, import_text, import_text])
