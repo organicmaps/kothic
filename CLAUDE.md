@@ -8,7 +8,7 @@ native binary drawing-rules files (`drules_*.bin`) plus the derived `types.txt`,
 `classificator.txt`, `visibility.txt`, `colors.txt` and `patterns.txt`.
 
 Pure Python, standard library only — `requirements.txt` is intentionally empty, do not add external
-dependencies. Keep the code compatible with Python 3.9 (CI's pinned version; README says 3.8+).
+dependencies. Keep the code compatible with Python 3.9 (CI tests 3.9 and 3.14; README says 3.8+).
 
 The style-editing workflow that drives this tool is documented in the parent repo
 (`data/CLAUDE.md`, `docs/STYLES.md` there).
@@ -23,7 +23,7 @@ python3 -m unittest discover -s tests
 python3 -m unittest tests.testDrules
 python3 -m unittest tests.testDrules.DrulesTest.test_parse_binary_skips_section_padding
 
-# Lint (default ruff rules; gates CI together with the unit tests)
+# Lint (gates CI together with the unit tests)
 ruff check --target-version=py39
 ```
 
@@ -67,7 +67,9 @@ Maps-specific compiler) → `src/drules.py` (native format) → merge tools.
 - Side effects beyond the `.bin`/`.txt` output: writes `types.txt`, `classificator.txt`,
   `visibility.txt` into the data dir; `colors.txt` and `patterns.txt` there are read first and
   rewritten, **accumulating** values across invocations; the priority files are re-formatted and
-  re-sorted **in place**. This is why `generate_drules.sh` stages everything in a temp dir.
+  re-sorted **in place**. `generate_drules.sh` stages single-variant binaries in a temp dir;
+  family outputs and side files are written directly into `DATA_PATH`, and priorities are updated
+  under `DATA_PATH/styles/`.
 - Priorities: four ranges (overlays / FG / BG-top / BG-by-size) documented at the top of the file.
   `LAYER_PRIORITY_RANGE` and `OVERLAYS_MAX_PRIORITY` must match `drule::kLayerPriorityRange` /
   `drule::kOverlaysMaxPriority` in the C++ core; the layering logic lives in
@@ -76,18 +78,20 @@ Maps-specific compiler) → `src/drules.py` (native format) → merge tools.
 - Validation: a missing priority, pathtext/shield with no line at that zoom, missing `text-color`,
   a caption with an icon but no `text-offset`, etc. increment `validation_errors_count`; the run
   then exits non-zero without writing drules.
-- Global state: the parsed `style`, `prio_ranges` and `visibilities` are module globals; workers
-  share them via the `fork` start method when `MULTIPROCESSING` is on. Any caller running
-  generation more than once per process must reset them and set
-  `libkomwm.MULTIPROCESSING = False` (see `integration-tests/full_drules_gen.py` and
-  `tests/testLibkomwm.py`).
+- Global state: each compilation rebuilds the parsed `style`. With `MULTIPROCESSING` enabled,
+  workers inherit it through an explicit `fork` context where available; otherwise evaluation is
+  serial. The interpreter's global start method is unchanged. For independent compilations in
+  one process, restore the initial `prio_ranges`, clear `visibilities` and reset
+  `validation_errors_count` before each call so priorities, visibility and errors do not carry
+  over. Multiprocessing may stay enabled across calls. `integration-tests/full_drules_gen.py`
+  selects serial evaluation and restores priorities and visibility before each theme.
 
 ### src/drules.py — native drawing-rules format
 
-- Replaced protobuf. Builder classes (`Container`, `ClassifElement`, `DrawElement`, `LineRule`, …)
-  mirror the old protobuf API: attribute assignment, eagerly-created sub-messages,
-  `.extend()`/`.append()` on repeated fields. Presence is tracked on scalar *assignment* only, so
-  the `if dr_element.symbol.priority:` read idiom in libkomwm never marks a child as set.
+- Builder classes (`Container`, `ClassifElement`, `DrawElement`, `LineRule`, …) let the compiler
+  construct rules through attribute assignment, eagerly-created sub-messages and
+  `.extend()`/`.append()` on repeated fields. Presence is tracked on scalar *assignment* only,
+  so reading `dr_element.symbol.priority` in libkomwm never marks a child as set.
 - **The wire format must stay in sync with `libs/indexer/drules_format.{hpp,cpp}` in the main
   repo** (magic `OMDR`, versioned, sections with skippable padding).
 - Color model: builders hold actual ARGB values; the palette+index encoding is internal to the
@@ -106,6 +110,8 @@ Maps-specific compiler) → `src/drules.py` (native format) → merge tools.
 ### Tests
 
 Each `tests/test*.py` inserts `src/` into `sys.path` itself, so tests run from the repo root
-without any packaging. Fixtures live in `tests/assets/case-*`; `testLibkomwm.py` runs a full
-mini-generation over a trimmed style (`case-2-generate-drules-mini`) and asserts on the produced
-files.
+without any packaging. Fixtures live in `tests/assets/case-*`; `testLibkomwm.py` copies the
+trimmed style (`case-2-generate-drules-mini`) into temporary directories and runs compiler
+subprocesses, giving each compilation fresh module globals and its own writable fixtures.
+It checks the generated files and compares the default path with serial evaluation when fork
+is unavailable.

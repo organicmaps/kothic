@@ -1,6 +1,8 @@
 import unittest
 import sys
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 # Add `src` directory to the import paths
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
@@ -74,6 +76,23 @@ class MapCSSTest(unittest.TestCase):
             "Route-color": (0.0, 0.0, 1.0),
             "Route-opacity": 0.5,
         })
+
+    def test_parse_utf8_file_and_import_with_legacy_default_encoding(self):
+        original_open = open
+
+        def legacy_open(filename, *args, **kwargs):
+            kwargs.setdefault('encoding', 'cp1252')
+            return original_open(filename, *args, **kwargs)
+
+        with TemporaryDirectory() as tmp:
+            main = Path(tmp) / 'main.mapcss'
+            imported = Path(tmp) / 'labels.mapcss'
+            main.write_text('/* Ё */\n@import("labels.mapcss");\n', encoding='utf-8')
+            imported.write_text('/* Ё */\nnode { text: "Ё"; }\n', encoding='utf-8')
+            parser = MapCSS()
+            with patch('mapcss.open', side_effect=legacy_open, create=True):
+                parser.parse(filename=str(main))
+            self.assertEqual(parser.choosers[0].styles[0]['text'], 'Ё')
 
     def test_parse_basic_chooser(self):
         parser = MapCSS()
