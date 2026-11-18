@@ -1,12 +1,6 @@
 Kothic Mapcss parser/processor tailored for Organic Maps use.
 
-Dependencies:
-* Python >= 3.8
-      
-Python dependencies:
-```bash
-pip3 install -r requirements.txt
-```
+Requires Python 3.11 or later. The compiler uses the standard library.
 
 ## Running unittests
 
