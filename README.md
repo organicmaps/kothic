@@ -29,3 +29,20 @@ python3 full_drules_gen.py -d ../../../data -o drules --txt
 This command will run generation for styles - default light, default dark,
 outdoors light, outdoors dark, vehicle light, vehicle dark and put `*.bin`
 and `*.txt` files into 'drules' subfolder.
+
+## Matching additional classifier types
+
+When a selector uses a second classifier key, Kothic emits an `extra_tag`
+condition for the drawing-rule reader. A feature must carry that classifier
+type or one of its descendants for the condition to match. Use `!=` to test
+for its absence. The reader must support `extra_tag`.
+
+```mapcss
+line|z15[highway=tertiary] { width: 1; color: #000000; }
+line|z15[highway=tertiary][hwtag=oneway] { width: 3; }
+```
+
+Tertiary roads use width 1 by default. The second declaration overrides the
+width for roads carrying `hwtag|oneway`. To specify a classifier path directly,
+register `extra_tag` in `mapcss-dynamic.txt` and write conditions such as
+`[extra_tag=highway=path=bicycle]`.

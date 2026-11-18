@@ -103,6 +103,7 @@ class MapCSS():
         self.choosers_by_type_zoom_tag = {}
         self.variables = {}
         self.unused_variables = set()
+        self.classifier_paths = set()
         self.style_loaded = False
 
     def parseZoom(self, s):
@@ -157,23 +158,43 @@ class MapCSS():
                         self.choosers_by_type_zoom_tag[ftype][zoom][clname][i] = optimized
 
 
-    def get_runtime_rules(self, clname, type, tags, zoom):
+    def get_classifier_condition_groups(self, clname, type, tags, zoom):
+        if type not in self.choosers_by_type_zoom_tag:
+            return
+        for chooser in self.choosers_by_type_zoom_tag[type][zoom][clname]:
+            if not any(rule.classifier_conditions for rule in chooser.ruleChains):
+                continue
+            groups = {}
+            for rule in chooser.ruleChains:
+                object_id = rule.test(tags)
+                if object_id:
+                    runtime_group = tuple((c.type, c.params) for c in rule.runtime_conditions or ())
+                    groups.setdefault((object_id, runtime_group), []).append(tuple(rule.classifier_conditions))
+            if len({object_id for object_id, _ in groups}) > 1:
+                # The first match for a layer determines its position relative to other layers.
+                yield from ((clause,) for clauses in groups.values() for clause in clauses if clause)
+            else:
+                # Any matching alternative applies the declaration once to the layer.
+                yield from (tuple(clauses) for clauses in groups.values() if all(clauses))
+
+    def get_runtime_rules(self, clname, type, tags, zoom, classifier_membership=None):
         """
         Returns array of runtime_conditions which are used for clname/type/tags/zoom
         """
         runtime_rules = []
         if type in self.choosers_by_type_zoom_tag:
             for chooser in self.choosers_by_type_zoom_tag[type][zoom][clname]:
-                runtime_rules.extend(chooser.get_runtime_conditions(tags))
+                runtime_rules.extend(chooser.get_runtime_conditions(tags, classifier_membership))
         return runtime_rules
 
     # TODO: Renamed to `get_styles` because it returns a list of styles for each class `::XXX`
     # Refactoring idea: Maybe return dict with `object-id` as a key
-    def get_style(self, clname, type, tags, zoom, xscale, zscale, filter_by_runtime_conditions):
+    def get_style(self, clname, type, tags, zoom, xscale, zscale, filter_by_runtime_conditions, classifier_membership=None):
         style = []
         if type in self.choosers_by_type_zoom_tag:
             for chooser in self.choosers_by_type_zoom_tag[type][zoom][clname]:
-                style = chooser.updateStyles(style, tags, xscale, zscale, filter_by_runtime_conditions)
+                style = chooser.updateStyles(style, tags, xscale, zscale, filter_by_runtime_conditions,
+                                             classifier_membership)
         style = [x for x in style if x["object-id"] != "::*"]
         for x in style:
             for k, v in [('width', 0), ('casing-width', 0)]:
@@ -193,11 +214,12 @@ class MapCSS():
             return colors[0].styles[0]
         return None
 
-    def get_style_dict(self, clname, type, tags={}, zoom=0, xscale=1, zscale=.5, olddict={}, filter_by_runtime_conditions=None):
+    def get_style_dict(self, clname, type, tags={}, zoom=0, xscale=1, zscale=.5, olddict={},
+                       filter_by_runtime_conditions=None, classifier_membership=None):
         """
         Kothic styling API
         """
-        r = self.get_style(clname, type, tags, zoom, xscale, zscale, filter_by_runtime_conditions)
+        r = self.get_style(clname, type, tags, zoom, xscale, zscale, filter_by_runtime_conditions, classifier_membership)
         d = olddict
         for x in r:
             if x.get('object-id', '') not in d:
@@ -231,10 +253,12 @@ class MapCSS():
                 css = css_file.read()
         if not self.style_loaded:
             self.choosers = []
+            self.classifier_paths.clear()
 
         log = logging.getLogger('mapcss.parser')
         previous = oNONE  # what was the previous CSS word?
         sc = StyleChooser(self.scalepair)  # currently being assembled
+        had_main_tag = False
 
         stck = [] # filename, original, remained
         stck.append([filename, css, css])
@@ -296,18 +320,14 @@ class MapCSS():
                         c = parseCondition(cond)
                         tag = c.extract_tag()
                         tag_type = static_tags.get(tag, None)
-                        if tag == "*" or tag_type is not None:
-                            if tag_type and had_main_tag:
-                                if '!' in cond:
-                                    condType = 'ne'
-                                    cond = cond.replace('!', '')
-                                else:
-                                    condType = 'eq'
-                                sc.addRuntimeCondition(Condition(condType, ('extra_tag', cond)))
-                            else:
-                                sc.addCondition(c)
-                                if tag_type:
-                                    had_main_tag = True
+                        if (tag_type and had_main_tag) or (c.params[0] == 'extra_tag' and 'extra_tag' in dynamic_tags):
+                            path, present = parse_classifier_condition(c)
+                            sc.ruleChains[-1].classifier_conditions.append((path, present))
+                            self.classifier_paths.add(path)
+                        elif tag == "*" or tag_type is not None:
+                            sc.addCondition(c)
+                            if tag_type:
+                                had_main_tag = True
                         elif tag in dynamic_tags:
                             sc.addRuntimeCondition(c)
                         else:
@@ -388,8 +408,7 @@ class MapCSS():
             css_orig = stck[-1][2] # original
             css = stck[-1][1] # remained
             line = css_orig[:-len(css)].count("\n") + 1
-            # TODO: Handle filename is None
-            msg = str(e) + "\nFile: " + filename + "\nLine: " + str(line)
+            msg = f"{e}\nFile: {filename or '<string>'}\nLine: {line}"
             # TODO: Print stack trace of original exception `e`
             raise Exception(msg)
 
@@ -426,6 +445,24 @@ class MapCSS():
         if self.unused_variables:
             # TODO: Do not print warning here. Instead let libkomwn.komap_mapswithme(...) analyze unused_variables
             print(f"Warning: Unused variables: {', '.join(self.unused_variables)}")
+
+def parse_classifier_condition(condition):
+    tag = condition.params[0]
+    operator = condition.type
+    if operator in ('eq', 'ne'):
+        path = condition.params[1] if tag == 'extra_tag' else '='.join(condition.params)
+    elif tag != 'extra_tag' and operator in ('set', 'unset', 'true', 'false'):
+        path = tag
+        if operator in ('true', 'false'):
+            path += '=yes' if operator == 'true' else '=no'
+    else:
+        raise ValueError(f'Unsupported classifier condition {condition}')
+
+    components = [part.strip() for part in path.split('=')]
+    if not all(components):
+        raise ValueError(f'Empty classifier path component in {condition}')
+    return '='.join(components), operator not in ('ne', 'unset')
+
 
 # TODO: move to Condition.py
 def parseCondition(s):

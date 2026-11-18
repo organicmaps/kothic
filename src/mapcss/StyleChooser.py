@@ -109,29 +109,21 @@ class StyleChooser:
         self.cached_tags = a
         return a
 
-    def get_runtime_conditions(self, tags):
-        """
-        Returns the runtime conditions of every ::object-id this chooser selects,
-        to match the testChainsAll() contract used by updateStyles().
-        """
+    def get_runtime_conditions(self, tags, classifier_membership=None):
         if not self.has_runtime_conditions:
             return []
-        return [rule.runtime_conditions for rule, _ in self.testChainsAll(tags) if rule.runtime_conditions]
+        # Each selector in a comma-separated group can activate the same layer under a different guard.
+        return [rule.runtime_conditions for rule in self.ruleChains
+                if rule.runtime_conditions and rule.matches_classifier(classifier_membership) and rule.test(tags)]
 
     # TODO: Rename to "applyStyles"
-    def updateStyles(self, sl, tags, xscale, zscale, filter_by_runtime_conditions):
-        # Are any of the ruleChains fulfilled?
-        for rule, object_id in self.testChainsAll(tags):
-            self.applyStylesTo(sl, tags, xscale, zscale, filter_by_runtime_conditions, rule, object_id)
+    def updateStyles(self, sl, tags, xscale, zscale, filter_by_runtime_conditions, classifier_membership=None):
+        for _, object_id in self.testChainsAll(tags, filter_by_runtime_conditions, classifier_membership):
+            self.applyStylesTo(sl, tags, xscale, zscale, object_id)
 
         return sl
 
-    def applyStylesTo(self, sl, tags, xscale, zscale, filter_by_runtime_conditions, rule, object_id):
-        if (filter_by_runtime_conditions is not None
-            and rule.runtime_conditions is not None
-            and filter_by_runtime_conditions != rule.runtime_conditions):
-            return sl
-
+    def applyStylesTo(self, sl, tags, xscale, zscale, object_id):
         for r in self.styles:
             if self.has_evals:
                 ra = {}
@@ -174,7 +166,7 @@ class StyleChooser:
 
         return sl
 
-    def testChainsAll(self, tags):
+    def testChainsAll(self, tags, filter_by_runtime_conditions=None, classifier_membership=None):
         """
         Yields the first matching rule for *each* distinct ::object-id of the
         selector group, so that a declaration block applies to every layer it
@@ -182,6 +174,11 @@ class StyleChooser:
         """
         object_ids = set()
         for r in self.ruleChains:
+            if (filter_by_runtime_conditions is not None and r.runtime_conditions is not None
+                    and filter_by_runtime_conditions != r.runtime_conditions):
+                continue
+            if not r.matches_classifier(classifier_membership):
+                continue
             tt = r.test(tags)
             if tt and tt not in object_ids:
                 object_ids.add(tt)

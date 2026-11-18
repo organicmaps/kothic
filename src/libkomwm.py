@@ -1,4 +1,4 @@
-from mapcss import MapCSS
+from mapcss import Condition, MapCSS
 from optparse import OptionParser
 import os
 import csv
@@ -126,6 +126,25 @@ def mwm_encode_image(st, prefix='icon', bgprefix='symbol'):
     return handle, handle
 
 
+def classifier_branches(groups):
+    """Partition membership only while it can change which declarations apply."""
+    if not groups:
+        yield {}
+        return
+
+    path, _ = next(iter(groups))[0][0]
+    for present in (False, True):
+        remaining = []
+        for clauses in groups:
+            alternatives = tuple(tuple(term for term in clause if term[0] != path)
+                                 for clause in clauses if (path, not present) not in clause)
+            # A group is decided when every alternative fails or one is satisfied.
+            if alternatives and all(alternatives):
+                remaining.append(alternatives)
+        for membership in classifier_branches(remaining):
+            yield {path: present, **membership}
+
+
 def query_style(args):
     global style
     cl, cltags, minzoom, maxzoom = args
@@ -138,48 +157,34 @@ def query_style(args):
     cltags["int_name"] = "int_name"
     cltags["addr:flats"] = "addr:flats"
 
+    kinds = ("area",) if "area" in cltags else ("line", "area", "node")
     results = []
     for zoom in range(minzoom, maxzoom + 1):
-        all_runtime_conditions_arr = []
-        # Get runtime conditions which are used for class 'cl' on zoom 'zoom'
-        if "area" not in cltags:
-            all_runtime_conditions_arr.extend(style.get_runtime_rules(clname, "line", cltags, zoom))
-        all_runtime_conditions_arr.extend(style.get_runtime_rules(clname, "area", cltags, zoom))
-        if "area" not in cltags:
-            all_runtime_conditions_arr.extend(style.get_runtime_rules(clname, "node", cltags, zoom))
+        memberships = (None,)
+        if style.classifier_paths:
+            groups = dict.fromkeys(group for kind in kinds
+                                   for group in style.get_classifier_condition_groups(clname, kind, cltags, zoom))
+            if groups:
+                memberships = classifier_branches(groups)
 
-        runtime_conditions_arr = []
-        if len(all_runtime_conditions_arr) == 0:
-            # If there is no runtime conditions, do not filter style by runtime conditions
-            runtime_conditions_arr.append(None)
-        elif len(all_runtime_conditions_arr) == 1:
-            runtime_conditions_arr = all_runtime_conditions_arr
-        else:
-            # Keep unique conditions only
-            runtime_conditions_arr.append(all_runtime_conditions_arr.pop(0))
-            for new_rt_conditions in all_runtime_conditions_arr:
-                conditions_unique = True
-                for rt_conditions in runtime_conditions_arr:
-                    if new_rt_conditions == rt_conditions:
-                        conditions_unique = False
-                        break
-                if conditions_unique:
-                    runtime_conditions_arr.append(new_rt_conditions)
+        # Evaluate the ordinary runtime condition groups inside each classifier branch.
+        for membership in memberships:
+            classifier_guards = [Condition('eq' if present else 'ne', ('extra_tag', path))
+                                 for path, present in (membership or {}).items()]
+            runtime_groups = []
+            for kind in kinds:
+                for conditions in style.get_runtime_rules(clname, kind, cltags, zoom, membership):
+                    if conditions not in runtime_groups:
+                        runtime_groups.append(conditions)
 
-        for runtime_conditions in runtime_conditions_arr:
-            zstyle = {}
-
-            # Get style for class 'cl' on zoom 'zoom' with corresponding runtime conditions
-            if "area" not in cltags:
-                linestyle = style.get_style_dict(clname, "line", cltags, zoom, olddict=zstyle, filter_by_runtime_conditions=runtime_conditions)
-                zstyle = linestyle
-            areastyle = style.get_style_dict(clname, "area", cltags, zoom, olddict=zstyle, filter_by_runtime_conditions=runtime_conditions)
-            zstyle = areastyle
-            if "area" not in cltags:
-                nodestyle = style.get_style_dict(clname, "node", cltags, zoom, olddict=zstyle, filter_by_runtime_conditions=runtime_conditions)
-                zstyle = nodestyle
-
-            results.append((cl, zoom, runtime_conditions, list(zstyle.values())))
+            for runtime_conditions in runtime_groups or [None]:
+                zstyle = {}
+                for kind in kinds:
+                    style.get_style_dict(clname, kind, cltags, zoom, olddict=zstyle,
+                                         filter_by_runtime_conditions=runtime_conditions,
+                                         classifier_membership=membership)
+                guards = classifier_guards + (runtime_conditions or [])
+                results.append((cl, zoom, guards, list(zstyle.values())))
     return results
 
 def get_priorities_filename(prio_range, path):
@@ -585,6 +590,14 @@ def komap_mapswithme(options):
     style.parse(clamp=False, stretch=LAYER_PRIORITY_RANGE,
                 filename=options.filename, static_tags=mapcss_static_tags,
                 dynamic_tags=mapcss_dynamic_tags)
+    if style.classifier_paths:
+        known_paths = set()
+        for cl in class_order:
+            path = class_tree[cl].split('|')
+            known_paths.update('='.join(path[:length]) for length in range(1, len(path) + 1))
+        unknown_paths = style.classifier_paths - known_paths
+        if unknown_paths:
+            raise ValueError(f"Unknown extra_tag classifier paths {', '.join(sorted(unknown_paths))}")
 
     # Build optimization tree - class/zoom/type -> StyleChoosers
     clname_cltag_unique = set()
