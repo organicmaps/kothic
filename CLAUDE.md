@@ -51,19 +51,19 @@ Maps-specific compiler) → `src/drules.py` (native format) → merge tools.
   expressions. `build_choosers_tree()`/`finalize_choosers_tree()` then index the parsed
   `StyleChooser`s by (object type, zoom, class name) with per-zoom pre-filtered rule chains — this
   optimization tree is what makes full generation fast.
-- Static vs dynamic tags: conditions on tags known from `mapcss-mapping.csv` are resolved at
-  compile time; conditions on tags listed in `mapcss-dynamic.txt` become *runtime conditions*,
-  emitted as `apply_if` strings in the drules and evaluated by the app at runtime.
-- `StyleChooser` = one selector+declaration block; `Rule` = one selector in a chain (subject, zoom,
-  conditions, `::object-id` subparts); `Condition` = one tag test; `Eval` compiles MapCSS `eval()`
-  to Python. `webcolors/` is a vendored color-name library.
+- Mapping tags are resolved at compile time. A second classifier key or explicit `extra_tag`
+  tests a stored classifier path. Runtime predicates are written as `apply_if` strings.
+- A `StyleChooser` holds one declaration block and its comma-separated `Rule` selectors. Each rule
+  has its own zoom range, layer and conditions. `Eval` compiles MapCSS `eval()` to Python.
+  `webcolors/` is a vendored color-name library.
 
 ### src/libkomwm.py — the compiler (main entry point)
 
 - Inputs: the stylesheet (`-s`), `mapcss-mapping.csv` (OSM tags → classificator types like
   `highway-primary`) and `mapcss-dynamic.txt` from the data dir (`-d`), `priorities_*.prio.txt`
   from `-p`. For every classificator type × zoom it queries the style and builds `DrawElement`s
-  (lines, areas, icons, captions, path texts, shields).
+  (lines, areas, icons, captions, path texts, shields). `runtime_selectors.py` partitions
+  classifier, name and population tests into disjoint cases for the affected cascades.
 - Side effects beyond the `.bin`/`.txt` output: writes `types.txt`, `classificator.txt`,
   `visibility.txt` into the data dir; `colors.txt` and `patterns.txt` there are read first and
   rewritten, **accumulating** values across invocations; the priority files are re-formatted and
@@ -75,9 +75,9 @@ Maps-specific compiler) → `src/drules.py` (native format) → merge tools.
   `drule::kOverlaysMaxPriority` in the C++ core; the layering logic lives in
   `drape_frontend/stylist.cpp`. Casing lines and captions-with-icons get automatic priorities
   derived from their main drule (optional captions are pushed below all other overlays).
-- Validation: a missing priority, pathtext/shield with no line at that zoom, missing `text-color`,
-  a caption with an icon but no `text-offset`, etc. increment `validation_errors_count`; the run
-  then exits non-zero without writing drules.
+- Style validation runs before drawing rules or side files are written. Guarded
+  path texts and shields require a line in the same branch. The `natural-land` canvas needs an
+  unconditional fill because it has no feature on which to test a runtime selector.
 - Global state: each compilation rebuilds the parsed `style`. With `MULTIPROCESSING` enabled,
   workers inherit it through an explicit `fork` context where available; otherwise evaluation is
   serial. The interpreter's global start method is unchanged. For independent compilations in
@@ -105,8 +105,8 @@ Maps-specific compiler) → `src/drules.py` (native format) → merge tools.
 ### Merge tools
 
 - `src/merge_variants.py` — packs single-variant `.bin`s of one style family into a family file.
-- `src/merge_styles.py` — takes the union of each type's zoom range across styles, filling missing
-  low/high zooms from the other style; output is tools-only (mwm viewer).
+- `src/merge_styles.py` — extends each type's zoom range with all rules at the primary style's
+  boundary zooms. Output is used by tools such as the MWM viewer.
 
 ### Tests
 

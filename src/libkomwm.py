@@ -1,4 +1,4 @@
-from mapcss import Condition, MapCSS
+from mapcss import MapCSS, visible_layers
 from optparse import OptionParser
 import os
 import csv
@@ -10,6 +10,7 @@ import mapcss.webcolors
 from drules import (BEVELJOIN, BUTTCAP, NOJOIN, ROUNDCAP, ROUNDJOIN,
                     ClassifElement, ColorElement, Container, DrawElement, LineRule,
                     serialize_binary, serialize_text)
+from runtime_selectors import runtime_variants
 
 whatever_to_hex = mapcss.webcolors.webcolors.whatever_to_hex
 whatever_to_cairo = mapcss.webcolors.webcolors.whatever_to_cairo
@@ -126,23 +127,46 @@ def mwm_encode_image(st, prefix='icon', bgprefix='symbol'):
     return handle, handle
 
 
-def classifier_branches(groups):
-    """Partition membership only while it can change which declarations apply."""
-    if not groups:
-        yield {}
-        return
+def matching_choosers(choosers, tags):
+    for chooser in choosers:
+        matches = list(chooser.matching_rules(tags))
+        if not matches:
+            continue
+        if len(matches) > 1 and len({layer for _, layer in matches}) == 1:
+            # An unconditional arm settles a declaration for a single layer.
+            for rule, layer in matches:
+                if not rule.runtime_conditions and not rule.classifier_conditions:
+                    matches = [(rule, layer)]
+                    break
+        yield chooser, matches
 
-    path, _ = next(iter(groups))[0][0]
-    for present in (False, True):
-        remaining = []
-        for clauses in groups:
-            alternatives = tuple(tuple(term for term in clause if term[0] != path)
-                                 for clause in clauses if (path, not present) not in clause)
-            # A group is decided when every alternative fails or one is satisfied.
-            if alternatives and all(alternatives):
-                remaining.append(alternatives)
-        for membership in classifier_branches(remaining):
-            yield {path: present, **membership}
+
+def style_variants(choices):
+    groups = []
+    for choosers in choices:
+        for _, matches in choosers:
+            ordinary_layers = set()
+            unconditional_layers = set()
+            for rule, layer in matches:
+                if rule.classifier_conditions:
+                    return runtime_variants(choices)
+                if rule.runtime_conditions:
+                    ordinary_layers.add(layer)
+                    if rule.runtime_conditions not in groups:
+                        groups.append(rule.runtime_conditions)
+                else:
+                    unconditional_layers.add(layer)
+            if not ordinary_layers.isdisjoint(unconditional_layers):
+                return runtime_variants(choices)
+    return ordinary_variants(groups)
+
+
+def ordinary_variants(groups):
+    for group in groups or [None]:
+        def accepts(rule, group=group):
+            return rule.runtime_conditions is None or rule.runtime_conditions == group
+
+        yield [str(c) for c in group or ()], accepts
 
 
 def query_style(args):
@@ -160,31 +184,20 @@ def query_style(args):
     kinds = ("area",) if "area" in cltags else ("line", "area", "node")
     results = []
     for zoom in range(minzoom, maxzoom + 1):
-        memberships = (None,)
-        if style.classifier_paths:
-            groups = dict.fromkeys(group for kind in kinds
-                                   for group in style.get_classifier_condition_groups(clname, kind, cltags, zoom))
-            if groups:
-                memberships = classifier_branches(groups)
-
-        # Evaluate the ordinary runtime condition groups inside each classifier branch.
-        for membership in memberships:
-            classifier_guards = [Condition('eq' if present else 'ne', ('extra_tag', path))
-                                 for path, present in (membership or {}).items()]
-            runtime_groups = []
-            for kind in kinds:
-                for conditions in style.get_runtime_rules(clname, kind, cltags, zoom, membership):
-                    if conditions not in runtime_groups:
-                        runtime_groups.append(conditions)
-
-            for runtime_conditions in runtime_groups or [None]:
+        choices = [list(matching_choosers(style.get_choosers(clname, kind, zoom), cltags)) for kind in kinds]
+        try:
+            for guards, accepts in style_variants(choices):
                 zstyle = {}
-                for kind in kinds:
-                    style.get_style_dict(clname, kind, cltags, zoom, olddict=zstyle,
-                                         filter_by_runtime_conditions=runtime_conditions,
-                                         classifier_membership=membership)
-                guards = classifier_guards + (runtime_conditions or [])
+                for choosers in choices:
+                    layers = []
+                    for chooser, matches in choosers:
+                        chooser.apply_matching_styles(layers, cltags, 1, .5,
+                                                      (match for match in matches if accepts(match[0])))
+                    for layer in visible_layers(layers):
+                        zstyle.setdefault(layer['object-id'], {}).update(layer)
                 results.append((cl, zoom, guards, list(zstyle.values())))
+        except ValueError as error:
+            raise ValueError(f'{cl} z{zoom}: {error}') from error
     return results
 
 def get_priorities_filename(prio_range, path):
@@ -518,7 +531,7 @@ def komap_mapswithme(options):
         patterns_in_file.close()
 
     # Build classificator tree from mapcss-mapping.csv file
-    types_file = open(os.path.join(ddir, 'types.txt'), "w", encoding='utf-8')
+    type_lines = []
 
     # The mapcss-mapping.csv format is described inside the file itself.
     # TODO: introduce new function to parse 'mapcss-mapping.csv' for better testability
@@ -540,7 +553,7 @@ def komap_mapswithme(options):
         if int(row[5]) < cnt:
             raise Exception('Wrong type id: {0}'.format(';'.join(row)))
         while int(row[5]) > cnt:
-            print("mapswithme", file=types_file)
+            type_lines.append("mapswithme")
             cnt += 1
         cnt += 1
 
@@ -552,17 +565,13 @@ def komap_mapswithme(options):
             class_order.append(cl)
             unique_types_check.add(cl)
             # Mark original type to distinguish it among replacing types.
-            print("*" + row[0], file=types_file)
+            type_lines.append("*" + row[0])
         else:
             # compatibility mode
-            if row[6]:
-                print(row[6], file=types_file)
-            else:
-                print("mapswithme", file=types_file)
+            type_lines.append(row[6] or "mapswithme")
         class_tree[cl] = row[0]
     class_order.sort()
     mapping_file.close()
-    types_file.close()
 
     output = ''
     for prio_range in prio_ranges.keys():
@@ -584,20 +593,17 @@ def komap_mapswithme(options):
     with open(os.path.join(ddir, 'mapcss-dynamic.txt'), encoding='utf-8') as dynamic_file:
         mapcss_dynamic_tags = set([line.rstrip() for line in dynamic_file])
 
+    known_paths = set()
+    for cl in class_order:
+        path = class_tree[cl].split('|')
+        known_paths.update('='.join(path[:length]) for length in range(1, len(path) + 1))
+
     # Parse style mapcss
     global style
     style = MapCSS(options.minzoom, options.maxzoom)
     style.parse(clamp=False, stretch=LAYER_PRIORITY_RANGE,
                 filename=options.filename, static_tags=mapcss_static_tags,
-                dynamic_tags=mapcss_dynamic_tags)
-    if style.classifier_paths:
-        known_paths = set()
-        for cl in class_order:
-            path = class_tree[cl].split('|')
-            known_paths.update('='.join(path[:length]) for length in range(1, len(path) + 1))
-        unknown_paths = style.classifier_paths - known_paths
-        if unknown_paths:
-            raise ValueError(f"Unknown extra_tag classifier paths {', '.join(sorted(unknown_paths))}")
+                dynamic_tags=mapcss_dynamic_tags, known_classifier_paths=known_paths)
 
     # Build optimization tree - class/zoom/type -> StyleChoosers
     clname_cltag_unique = set()
@@ -722,9 +728,7 @@ def komap_mapswithme(options):
                 dr_element = DrawElement()
                 dr_element.scale = zoom
 
-                if runtime_conditions:
-                    for rc in runtime_conditions:
-                        dr_element.apply_if.append(str(rc))
+                dr_element.apply_if.extend(runtime_conditions)
 
                 for st in zstyle:
                     if st.get('casing-width') not in (None, 0) or st.get('casing-width-add') is not None:  # and (st.get('width') or st.get('fill-color')):
@@ -881,6 +885,12 @@ def komap_mapswithme(options):
                             store_visibility(cl, 'area', st.get('object-id'), zoom)
                             has_fills = False
 
+                if runtime_conditions:
+                    if cl == 'natural-land' and dr_element.area._is_set():
+                        raise ValueError(f'Feature-dependent background at z{zoom} for {cl}')
+                    if not dr_element.lines and (dr_element.path_text._is_set() or dr_element.shield._is_set()):
+                        raise ValueError(f'Path text or shield without line at z{zoom} for {cl} if {runtime_conditions}')
+
                 str_dr_element = dr_cont.name + "/" + str(dr_element)
                 if str_dr_element not in all_draw_elements:
                     all_draw_elements.add(str_dr_element)
@@ -916,6 +926,9 @@ def komap_mapswithme(options):
     if options.txt:
         with open(options.outfile + '.txt', 'w', encoding='utf-8') as drules_txt:
             drules_txt.write(serialize_text([drules], [variant]))
+
+    with open(os.path.join(ddir, 'types.txt'), "w", encoding='utf-8') as types_file:
+        types_file.writelines(line + '\n' for line in type_lines)
 
     # Write classificator.txt and visibility.txt files
 
@@ -1001,7 +1014,10 @@ def main():
         parser.error("A path to priorities *.prio.txt files is required.")
     options.priorities_path = os.path.normpath(options.priorities_path)
 
-    komap_mapswithme(options)
+    try:
+        komap_mapswithme(options)
+    except ValueError as error:
+        parser.error(str(error))
 
 if __name__ == '__main__':
     if PROFILE:
