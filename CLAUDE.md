@@ -7,8 +7,8 @@ Kothic is the MapCSS → drawing-rules compiler for Organic Maps, checked out as
 native binary drawing-rules files (`drules_*.bin`) plus the derived `types.txt`,
 `classificator.txt`, `visibility.txt`, `colors.txt` and `patterns.txt`.
 
-Pure Python, standard library only — `requirements.txt` is intentionally empty, do not add external
-dependencies. Keep the code compatible with Python 3.9 (CI tests 3.9 and 3.14; README says 3.8+).
+Kothic uses the Python standard library. Keep the code compatible with Python 3.11.
+CI uses the Ubuntu runner's default Python and exercises the minimum version on Windows.
 
 The style-editing workflow that drives this tool is documented in the parent repo
 (`data/CLAUDE.md`, `docs/STYLES.md` there).
@@ -24,7 +24,7 @@ python3 -m unittest tests.testDrules
 python3 -m unittest tests.testDrules.DrulesTest.test_parse_binary_skips_section_padding
 
 # Lint (gates CI together with the unit tests)
-ruff check --target-version=py39
+ruff check
 ```
 
 Integration run — regenerates all themes from the parent Organic Maps checkout (assumes this repo
