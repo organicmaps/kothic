@@ -6,3 +6,6 @@ src/tiles/
 *swp
 *bak
 /.idea
+
+AGENTS.override.md
+CLAUDE.local.md
