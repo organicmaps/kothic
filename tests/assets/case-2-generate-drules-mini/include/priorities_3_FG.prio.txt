@@ -12,15 +12,19 @@
 # - BG-top: water (linear and areal)
 # - BG-by-size: landcover areas sorted by their size
 
-highway-motorway                                    # line z6- (also has pathtext z10-, shield::shield z10-)
-highway-motorway-bridge                             # line z6- (also has pathtext z10-, shield::shield z10-)
-highway-motorway-tunnel                             # line z6- (also has pathtext z10-, shield::shield z10-)
+highway-motorway                                    # line z6- (also has pathtext z10-)
+highway-motorway-bridge                             # line z6- (also has pathtext z10-)
+highway-motorway-tunnel                             # line z6- (also has pathtext z10-)
 highway-trunk                                       # line z6- (also has pathtext z10-, shield::shield z10-)
 highway-trunk-bridge                                # line z6- (also has pathtext z10-, shield::shield z10-)
 highway-trunk-tunnel                                # line z6- (also has pathtext z10-, shield::shield z10-)
-highway-world_level                                 # line z4-9
-highway-world_towns_level                           # line z6-9
+highway-world_level                                 # line z4-9 (also has line(casing) z4-9)
+highway-world_towns_level                           # line z6-9 (also has line(casing) z6-9)
 === 310
+
+# highway-world_level                               # line(casing) z4-9 (also has line z4-9)
+# highway-world_towns_level                         # line(casing) z6-9 (also has line z6-9)
+# === 309
 
 highway-primary                                     # line z8- (also has pathtext z10-, shield::shield z10-)
 highway-primary-bridge                              # line z8- (also has pathtext z10-, shield::shield z10-)
