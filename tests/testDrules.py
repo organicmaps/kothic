@@ -94,6 +94,21 @@ class DrulesTest(unittest.TestCase):
         self.assertEqual([element.scale for element in merged.cont[0].element], [5, 7])
         self.assertEqual([element.lines[0].width for element in merged.cont[0].element], [2.0, 4.0])
 
+    def test_merge_styles_preserves_all_boundary_branches(self):
+        off, on = _make_element(15, 1.0), _make_element(15, 3.0)
+        off.apply_if.append('extra_tag!=hwtag=oneway')
+        on.apply_if.append('extra_tag=hwtag=oneway')
+        base = _make_container(("highway-tertiary", [off, on]))
+        alternative = _make_container(("highway-tertiary", [_make_element(14, 2.0), _make_element(17, 2.0)]))
+
+        with redirect_stdout(StringIO()):
+            diff = merge_styles.create_diff(merge_styles.read_zoom_extremes(base),
+                                            merge_styles.read_zoom_extremes(alternative))
+        [road] = merge_styles.apply_diff(base, diff).cont
+        self.assertEqual([(e.scale, e.apply_if, e.lines[0].width) for e in road.element],
+                         [(zoom, e.apply_if, e.lines[0].width) for zoom in range(14, 18) for e in (off, on)])
+        self.assertEqual((off.scale, on.scale), (15, 15))
+
     def test_serialize_text_inlines_colors(self):
         light = _make_container(("highway-primary", [_make_element(10, 2.0)]))
         dark = _make_container(("highway-primary", [_make_element(10, 2.0)]))

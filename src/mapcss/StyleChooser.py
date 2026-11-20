@@ -58,22 +58,7 @@ def make_nice_style(r):
 
 
 class StyleChooser:
-    """
-    A StyleChooser object is equivalent to one CSS selector+declaration.
-
-    Its ruleChains property is an array of all the selectors, which would
-    traditionally be comma-separated. For example:
-            h1, h2, h3 em
-    is three ruleChains.
-
-    Each ruleChain is itself an array of nested selectors. So the above
-    example would roughly be encoded as:
-            [[h1],[h2],[h3,em]]
-              ^^   ^^   ^^ ^^   each of these is a Rule
-
-    The styles property is an array of all the style objects to be drawn
-        if any of the ruleChains evaluate to true.
-    """
+    """One declaration block with its comma-separated selectors in source order."""
     # TODO: use logging for debug logs
 
     def __repr__(self):
@@ -95,10 +80,11 @@ class StyleChooser:
             return self.cached_tags
         a = set()
         for r in self.ruleChains:
-            a.update(r.extract_tags())
-            if "*" in a:
+            tags = r.extract_tags()
+            if not tags or "*" in tags:
                 a = set('*')
                 break
+            a.update(tags)
         if self.has_evals and "*" not in a:
             for s in self.styles:
                 for v in list(s.values()):
@@ -110,28 +96,26 @@ class StyleChooser:
         return a
 
     def get_runtime_conditions(self, tags):
-        """
-        Returns the runtime conditions of every ::object-id this chooser selects,
-        to match the testChainsAll() contract used by updateStyles().
-        """
         if not self.has_runtime_conditions:
             return []
-        return [rule.runtime_conditions for rule, _ in self.testChainsAll(tags) if rule.runtime_conditions]
+        # Each selector in a comma-separated group can activate the same layer under a different guard.
+        return [rule.runtime_conditions for rule, _ in self.matching_rules(tags) if rule.runtime_conditions]
 
-    # TODO: Rename to "applyStyles"
     def updateStyles(self, sl, tags, xscale, zscale, filter_by_runtime_conditions):
-        # Are any of the ruleChains fulfilled?
-        for rule, object_id in self.testChainsAll(tags):
-            self.applyStylesTo(sl, tags, xscale, zscale, filter_by_runtime_conditions, rule, object_id)
-
+        for _, object_id in self.testChainsAll(tags, filter_by_runtime_conditions):
+            self.applyStylesTo(sl, tags, xscale, zscale, object_id)
         return sl
 
-    def applyStylesTo(self, sl, tags, xscale, zscale, filter_by_runtime_conditions, rule, object_id):
-        if (filter_by_runtime_conditions is not None
-            and rule.runtime_conditions is not None
-            and filter_by_runtime_conditions != rule.runtime_conditions):
-            return sl
+    def apply_matching_styles(self, sl, tags, xscale, zscale, matches):
+        # eval(prop(...)) can read properties from layers already applied in this block.
+        applied = set()
+        for _, object_id in matches:
+            if object_id not in applied:
+                applied.add(object_id)
+                self.applyStylesTo(sl, tags, xscale, zscale, object_id)
+        return sl
 
+    def applyStylesTo(self, sl, tags, xscale, zscale, object_id):
         for r in self.styles:
             if self.has_evals:
                 ra = {}
@@ -174,24 +158,22 @@ class StyleChooser:
 
         return sl
 
-    def testChainsAll(self, tags):
-        """
-        Yields the first matching rule for *each* distinct ::object-id of the
-        selector group, so that a declaration block applies to every layer it
-        selects instead of just the first one.
-        """
-        object_ids = set()
-        for r in self.ruleChains:
-            tt = r.test(tags)
-            if tt and tt not in object_ids:
-                object_ids.add(tt)
-                yield r, tt
+    def matching_rules(self, tags):
+        for rule in self.ruleChains:
+            object_id = rule.test(tags)
+            if object_id:
+                yield rule, object_id
 
-    def newGroup(self):
-        """
-        starts a new ruleChain in this.ruleChains
-        """
-        pass
+    def testChainsAll(self, tags, filter_by_runtime_conditions=None):
+        """Yield the first eligible selector for each layer in source order."""
+        object_ids = set()
+        for r, object_id in self.matching_rules(tags):
+            if (filter_by_runtime_conditions is not None and r.runtime_conditions is not None
+                    and filter_by_runtime_conditions != r.runtime_conditions):
+                continue
+            if object_id not in object_ids:
+                object_ids.add(object_id)
+                yield r, object_id
 
     def newObject(self, e=''):
         # print "newRule"

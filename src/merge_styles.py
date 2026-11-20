@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Merges several single-variant native drules files into one by taking the union of each type's
-zoom range (a missing low/high zoom in one style is filled from another). Prints the differences
-to stdout. The result is a tools-only file (e.g. for the mwm viewer) and is not bundled into the
-apps.
+"""Extend each type's zoom range to cover all input styles.
+
+Retain the earliest style that defines the type and copy all rules at its boundary zooms
+outward as needed. The result is for tools such as the MWM viewer.
 
 Usage: merge_styles.py <in1.bin> <in2.bin> [<in3.bin> ...] <out.bin> [<out.txt>]
 """
@@ -15,25 +15,11 @@ import drules
 
 
 def read_zoom_extremes(cont):
-    """For each type returns [lowest-zoom element, highest-zoom element, all elements]."""
-    result = {}
+    elements_by_type = collections.defaultdict(list)
     for rule in cont.cont:
-        zooms = [None, None, list(rule.element)]
-        for elem in rule.element:
-            if zooms[1] is None or elem.scale > zooms[1].scale:
-                zooms[1] = elem
-            if zooms[0] is None or elem.scale < zooms[0].scale:
-                zooms[0] = elem
-        if zooms[0] is not None:
-            name = rule.name
-            if name in result:
-                if result[name][0].scale < zooms[0].scale:
-                    zooms[0] = result[name][0]
-                if result[name][1].scale > zooms[1].scale:
-                    zooms[1] = result[name][1]
-                zooms[2] = result[name][2] + zooms[2]
-            result[name] = zooms
-    return result
+        elements_by_type[rule.name].extend(rule.element)
+    return {typ: (min(e.scale for e in elements), max(e.scale for e in elements), elements)
+            for typ, elements in elements_by_type.items() if elements}
 
 
 def zooms_string(z1, z2):
@@ -42,22 +28,19 @@ def zooms_string(z1, z2):
     return "zoom {}".format(z1)
 
 
-def add_missing_zooms(dest, typ, source, target, high):
-    """Appends as many copies of source (re-scaled) to dest[typ] as needed to extend target's zoom
-    range to cover source's."""
-    if high:
-        scales = (target.scale + 1, source.scale + 1)
-    else:
-        scales = (source.scale, target.scale)
-
-    if scales[1] < scales[0]:
-        print("{}: missing {} {}".format(typ, "high" if high else "low", zooms_string(scales[1], scales[0] - 1)))
-        for z in range(scales[1], scales[0]):
-            fix = copy.deepcopy(source)
-            fix.scale = z
-            dest[typ].append(fix)
-    elif scales[1] > scales[0]:
-        print("{}: extra {} {}".format(typ, "high" if high else "low", zooms_string(scales[0], scales[1] - 1)))
+def add_missing_zooms(dest, typ, elements, source, target, high):
+    start, end = (source + 1, target + 1) if high else (target, source)
+    side = "high" if high else "low"
+    if start < end:
+        print(f"{typ}: missing {side} {zooms_string(start, end - 1)}")
+        boundary = [element for element in elements if element.scale == source]
+        for z in range(start, end):
+            for element in boundary:
+                fix = copy.deepcopy(element)
+                fix.scale = z
+                dest[typ].append(fix)
+    elif end < start:
+        print(f"{typ}: extra {side} {zooms_string(end, start - 1)}")
 
 
 def create_diff(zooms1, zooms2):
@@ -65,20 +48,21 @@ def create_diff(zooms1, zooms2):
     add_elements_high = collections.defaultdict(list)
     seen = set(zooms2.keys())
     for typ in zooms1:
+        low, high, elements = zooms1[typ]
         if typ in zooms2:
             seen.remove(typ)
-            add_missing_zooms(add_elements_low, typ, zooms1[typ][0], zooms2[typ][0], False)
-            add_missing_zooms(add_elements_high, typ, zooms1[typ][1], zooms2[typ][1], True)
+            add_missing_zooms(add_elements_low, typ, elements, low, zooms2[typ][0], False)
+            add_missing_zooms(add_elements_high, typ, elements, high, zooms2[typ][1], True)
         else:
-            print("{}: not found in the alternative style; {}".format(
-                typ, zooms_string(zooms1[typ][0].scale, zooms1[typ][1].scale)))
+            print(f"{typ}: not found in the alternative style; {zooms_string(low, high)}")
 
     add_types = []
     for typ in sorted(seen):
-        print("{}: missing completely; {}".format(typ, zooms_string(zooms2[typ][0].scale, zooms2[typ][1].scale)))
+        low, high, elements = zooms2[typ]
+        print(f"{typ}: missing completely; {zooms_string(low, high)}")
         cont = drules.ClassifElement()
         cont.name = typ
-        cont.element.extend(copy.deepcopy(zooms2[typ][2]))
+        cont.element.extend(copy.deepcopy(elements))
         add_types.append(cont)
 
     return (add_elements_low, add_elements_high, add_types)

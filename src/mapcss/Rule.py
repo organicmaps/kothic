@@ -26,6 +26,7 @@ type_matches = {
 class Rule():
     def __init__(self, s=''):
         self.runtime_conditions = None
+        self.classifier_conditions = []
         self.conditions = []
         # self.isAnd = True
         self.minZoom = 0
@@ -36,7 +37,8 @@ class Rule():
         self.type_matches = type_matches[s] if s in type_matches else set()
 
     def __repr__(self):
-        return "%s|z%s-%s %s %s" % (self.subject, self.minZoom, self.maxZoom, self.conditions, self.runtime_conditions)
+        return "%s|z%s-%s %s %s %s" % (self.subject, self.minZoom, self.maxZoom, self.conditions,
+                                       self.runtime_conditions, self.classifier_conditions)
 
     def test(self, tags):
         subpart = "::default"
