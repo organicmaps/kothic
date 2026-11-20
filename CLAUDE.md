@@ -10,6 +10,8 @@ native binary drawing-rules files (`drules_*.bin`) plus the derived `types.txt`,
 Kothic uses the Python standard library. Keep the code compatible with Python 3.11.
 CI uses the Ubuntu runner's default Python and exercises the minimum version on Windows.
 
+Prefer type hints when they clarify function contracts or the shape of complex data.
+
 The style-editing workflow that drives this tool is documented in the parent repo
 (`data/CLAUDE.md`, `docs/STYLES.md` there).
 
