@@ -451,6 +451,17 @@ def dump_priorities(prio_range, path, maxzoom):
 
             outfile.write(f'{group}{group_comment}=== {group_prio}\n')
 
+def get_shield_height(value, cl, zoom):
+    try:
+        height = int(value)
+    except ValueError:
+        height = -1
+    # The native ShieldRule stores its height as a signed int32.
+    if not 0 <= height < 1 << 31:
+        raise ValueError(f'Invalid shield-font-size {value!r} for {cl} at z{zoom}: expected 0..2147483647')
+    return height
+
+
 def get_drape_priority(cl, dr_type, object_id, auto_dr_type = None, auto_comment = None, auto_prio_mod = 0):
     if object_id == '::default':
         object_id = ''
@@ -795,8 +806,9 @@ def komap_mapswithme(options):
                             store_visibility(cl, 'line', st.get('object-id'), zoom)
                             dr_element.lines.extend([dr_line])
 
-                    if st.get('shield-font-size'):
-                        dr_element.shield.height = int(st.get('shield-font-size', 10))
+                    shield_size = st.get('shield-font-size')
+                    if shield_size and (shield_height := get_shield_height(shield_size, cl, zoom)):
+                        dr_element.shield.height = shield_height
                         dr_element.shield.text_color = mwm_encode_color(colors, st, "shield-text")
                         if st.get('shield-text-halo-radius', 0) != 0:
                             dr_element.shield.text_stroke_color = mwm_encode_color(colors, st, "shield-text-halo", "white")
