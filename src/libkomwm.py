@@ -7,7 +7,7 @@ from sys import exit
 from multiprocessing import get_all_start_methods, get_context
 from collections import OrderedDict
 import mapcss.webcolors
-from drules import (BEVELJOIN, BUTTCAP, NOJOIN, ROUNDCAP, ROUNDJOIN,
+from drules import (BEVELJOIN, BUTTCAP, NOJOIN, ROUNDCAP, ROUNDJOIN, SQUARECAP,
                     ClassifElement, ColorElement, Container, DrawElement, LineRule,
                     serialize_binary, serialize_text)
 from runtime_selectors import runtime_variants
@@ -652,8 +652,18 @@ def komap_mapswithme(options):
 
     visibility = {}
 
-    dr_linecaps = {'none': BUTTCAP, 'butt': BUTTCAP, 'round': ROUNDCAP}
+    dr_linecaps = {'none': BUTTCAP, 'butt': BUTTCAP, 'round': ROUNDCAP, 'square': SQUARECAP}
     dr_linejoins = {'none': NOJOIN, 'bevel': BEVELJOIN, 'round': ROUNDJOIN}
+
+    def set_line_style(line, st, prefix, cl, zoom):
+        dashes = st.get(prefix + 'dashes', st.get('dashes', []))
+        line.cap = get_line_style(dr_linecaps, st, prefix + 'linecap', 'butt', cl, zoom)
+        line.join = get_line_style(dr_linejoins, st, prefix + 'linejoin', 'round', cl, zoom)
+        if line.cap == SQUARECAP and len(dashes) > 2:
+            raise ValueError(f'Unsupported {prefix}linecap square with {len(dashes)} pattern values '
+                             f'for {cl}{st["object-id"]} at z{zoom}')
+        line.dashdot.dd.extend(float(value) for value in dashes)
+        addPattern(line.dashdot.dd)
 
     # Build drules tree
 
@@ -778,11 +788,7 @@ def komap_mapswithme(options):
                                 # A casing line explicitly defined via ::object_id.
                                 dr_line.priority = get_drape_priority(cl, 'line', st.get('object-id'))
                                 store_visibility(cl, 'line', st.get('object-id'), zoom)
-                            for i in st.get('casing-dashes', st.get('dashes', [])):
-                                dr_line.dashdot.dd.extend([float(i)])
-                            addPattern(dr_line.dashdot.dd)
-                            dr_line.cap = get_line_style(dr_linecaps, st, 'casing-linecap', 'butt', cl, zoom)
-                            dr_line.join = get_line_style(dr_linejoins, st, 'casing-linejoin', 'round', cl, zoom)
+                            set_line_style(dr_line, st, 'casing-', cl, zoom)
                             dr_element.lines.extend([dr_line])
 
                         if has_fills and is_area_st and float(st.get('fill-opacity', 1)) > 0:
@@ -794,11 +800,7 @@ def komap_mapswithme(options):
                             dr_line = LineRule()
                             dr_line.width = st.get('width', 0)
                             dr_line.color = mwm_encode_color(colors, st)
-                            for i in st.get('dashes', []):
-                                dr_line.dashdot.dd.extend([float(i)])
-                            addPattern(dr_line.dashdot.dd)
-                            dr_line.cap = get_line_style(dr_linecaps, st, 'linecap', 'butt', cl, zoom)
-                            dr_line.join = get_line_style(dr_linejoins, st, 'linejoin', 'round', cl, zoom)
+                            set_line_style(dr_line, st, '', cl, zoom)
                             dr_line.priority = get_drape_priority(cl, 'line', st.get('object-id'))
                             store_visibility(cl, 'line', st.get('object-id'), zoom)
                             dr_element.lines.extend([dr_line])

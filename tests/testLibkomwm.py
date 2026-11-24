@@ -133,13 +133,28 @@ line|z15[highway=tertiary]::outer { casing-width: 1; casing-width-add: 7; casing
             (6, drules.ROUNDCAP, drules.ROUNDJOIN, 110),
         ])
 
+    def test_square_line_and_casing_caps(self):
+        [element] = self.compile_classifier_style("""
+line|z15[highway=tertiary] { width: 4; linecap: square; casing-width: 2; casing-linecap: square; }
+""")
+        self.assertEqual([(line.width, line.cap, line.priority) for line in element.lines], [
+            (8, drules.SQUARECAP, 99),
+            (4, drules.SQUARECAP, 100),
+        ])
+
+    def test_square_cap_rejects_triangle_patterns(self):
+        for cap, pattern in [('linecap', 'dashes'), ('casing-linecap', 'casing-dashes'), ('casing-linecap', 'dashes')]:
+            with self.subTest(cap=cap, pattern=pattern):
+                self.compile_classifier_style(
+                    f'line|z15[highway=tertiary] {{ width: 4; casing-width: 1; {cap}: square; {pattern}: 2,3,1,1; }}',
+                    error=f'Unsupported {cap} square with 4 pattern values')
+
     def test_invalid_caps_and_joins_preserve_outputs(self):
-        for key, value in [('linecap', 'square'), ('linejoin', 'typo'),
-                           ('casing-linecap', 'square'), ('casing-linejoin', 'typo')]:
+        for key in ('linecap', 'linejoin', 'casing-linecap', 'casing-linejoin'):
             with self.subTest(key=key):
                 self.compile_classifier_style(
-                    f'line|z15[highway=tertiary]::outer {{ width: 4; casing-width: 1; {key}: {value}; }}',
-                    error=f'Unsupported {key} {value!r} for highway-tertiary::outer at z15')
+                    f'line|z15[highway=tertiary]::outer {{ width: 4; casing-width: 1; {key}: typo; }}',
+                    error=f"Unsupported {key} 'typo' for highway-tertiary::outer at z15")
 
     def matching_lines(self, elements, *types, named=False, population=0):
         def matches(guard):
