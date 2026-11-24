@@ -451,6 +451,14 @@ def dump_priorities(prio_range, path, maxzoom):
 
             outfile.write(f'{group}{group_comment}=== {group_prio}\n')
 
+def get_line_style(values, st, key, default, cl, zoom):
+    value = st.get(key, default)
+    try:
+        return values[value]
+    except KeyError:
+        raise ValueError(f'Unsupported {key} {value!r} for {cl}{st["object-id"]} at z{zoom}') from None
+
+
 def get_shield_height(value, cl, zoom):
     try:
         height = int(value)
@@ -742,9 +750,10 @@ def komap_mapswithme(options):
                 dr_element.apply_if.extend(runtime_conditions)
 
                 for st in zstyle:
-                    if st.get('casing-width') not in (None, 0) or st.get('casing-width-add') is not None:  # and (st.get('width') or st.get('fill-color')):
+                    casing_width = st.get('casing-width', 0)
+                    if casing_width or 'casing-width-add' in st:
                         is_area_st = 'fill-color' in st
-                        if has_lines and not is_area_st and st.get('casing-linecap', 'butt') == 'butt':
+                        if has_lines and not is_area_st:
                             dr_line = LineRule()
 
                             base_width = st.get('width', 0)
@@ -754,12 +763,11 @@ def komap_mapswithme(options):
                                         # Rail bridge styles use width from ::dash object instead of ::default.
                                         if base_width == 0 or wst.get('object-id') != '::default':
                                             base_width = wst.get('width', 0)
-                                # 'casing-width' has precedence over 'casing-width-add'.
-                                if st.get('casing-width') in (None, 0):
-                                    st['casing-width'] = base_width + st.get('casing-width-add')
-                                    base_width = 0
-
-                            dr_line.width = round(base_width + st.get('casing-width') * 2, 2)
+                            if casing_width:
+                                width = base_width + 2 * casing_width
+                            else:
+                                width = 2 * (base_width + st['casing-width-add'])
+                            dr_line.width = round(width, 2)
                             dr_line.color = mwm_encode_color(colors, st, "casing")
                             if st.get('object-id') == '::default':
                                 # An automatic casing line should be rendered below the "main" line, hence auto priority -1.
@@ -773,13 +781,13 @@ def komap_mapswithme(options):
                             for i in st.get('casing-dashes', st.get('dashes', [])):
                                 dr_line.dashdot.dd.extend([float(i)])
                             addPattern(dr_line.dashdot.dd)
-                            dr_line.cap = dr_linecaps.get(st.get('casing-linecap', 'butt'), BUTTCAP)
-                            dr_line.join = dr_linejoins.get(st.get('casing-linejoin', 'round'), ROUNDJOIN)
+                            dr_line.cap = get_line_style(dr_linecaps, st, 'casing-linecap', 'butt', cl, zoom)
+                            dr_line.join = get_line_style(dr_linejoins, st, 'casing-linejoin', 'round', cl, zoom)
                             dr_element.lines.extend([dr_line])
 
                         if has_fills and is_area_st and float(st.get('fill-opacity', 1)) > 0:
                             dr_element.area.border.color = mwm_encode_color(colors, st, "casing")
-                            dr_element.area.border.width = st.get('casing-width', 0)
+                            dr_element.area.border.width = casing_width
 
                     if has_lines:
                         if st.get('width'):
@@ -789,8 +797,8 @@ def komap_mapswithme(options):
                             for i in st.get('dashes', []):
                                 dr_line.dashdot.dd.extend([float(i)])
                             addPattern(dr_line.dashdot.dd)
-                            dr_line.cap = dr_linecaps.get(st.get('linecap', 'butt'), BUTTCAP)
-                            dr_line.join = dr_linejoins.get(st.get('linejoin', 'round'), ROUNDJOIN)
+                            dr_line.cap = get_line_style(dr_linecaps, st, 'linecap', 'butt', cl, zoom)
+                            dr_line.join = get_line_style(dr_linejoins, st, 'linejoin', 'round', cl, zoom)
                             dr_line.priority = get_drape_priority(cl, 'line', st.get('object-id'))
                             store_visibility(cl, 'line', st.get('object-id'), zoom)
                             dr_element.lines.extend([dr_line])
