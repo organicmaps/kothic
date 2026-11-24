@@ -7,7 +7,7 @@ from sys import exit
 from multiprocessing import get_all_start_methods, get_context
 from collections import OrderedDict
 import mapcss.webcolors
-from drules import (BEVELJOIN, BUTTCAP, NOJOIN, ROUNDCAP, ROUNDJOIN,
+from drules import (BEVELJOIN, BUTTCAP, NOJOIN, ROUNDCAP, ROUNDJOIN, SQUARECAP,
                     ClassifElement, ColorElement, Container, DrawElement, LineRule,
                     serialize_binary, serialize_text)
 from runtime_selectors import runtime_variants
@@ -652,7 +652,7 @@ def komap_mapswithme(options):
 
     visibility = {}
 
-    dr_linecaps = {'none': BUTTCAP, 'butt': BUTTCAP, 'round': ROUNDCAP}
+    dr_linecaps = {'none': BUTTCAP, 'butt': BUTTCAP, 'round': ROUNDCAP, 'square': SQUARECAP}
     dr_linejoins = {'none': NOJOIN, 'bevel': BEVELJOIN, 'round': ROUNDJOIN}
 
     # Build drules tree
