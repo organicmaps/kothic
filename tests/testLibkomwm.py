@@ -87,18 +87,40 @@ class LibKomwmTest(unittest.TestCase):
             types_file = directory / 'types.txt'
             types_file.write_text('existing types\n', encoding='utf-8')
             output = directory / 'rules'
+            if error is not None:
+                output.with_suffix('.bin').write_bytes(b'existing rules')
+                original = {p.name: p.read_bytes() for p in directory.iterdir()}
             run = subprocess.run([sys.executable, libkomwm.__file__, '-s', str(directory / 'style.mapcss'),
                                   '-o', str(output), '-d', tmp, '-p', tmp, '-t', '15'], capture_output=True, text=True)
             if error is not None:
                 self.assertNotEqual(run.returncode, 0, run.stdout + run.stderr)
                 self.assertIn(error, run.stderr)
-                self.assertFalse(output.with_suffix('.bin').exists())
-                self.assertEqual(types_file.read_text(encoding='utf-8'), 'existing types\n')
+                self.assertEqual({p.name: p.read_bytes() for p in directory.iterdir()}, original)
                 return
             self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
             rules = drules.load_container(output.with_suffix('.bin'))
             entry = next(entry for entry in rules.cont if entry.name == type_name)
             return [element for element in entry.element if element.scale == 15]
+
+    def test_shield_font_size_override(self):
+        css = """
+line|z15[highway=tertiary] { width: 1; color: #000000; }
+line|z15[highway=tertiary]::label { shield-color: #ffffff; shield-font-size: 9; }
+"""
+        [element] = self.compile_classifier_style(css)
+        self.assertEqual(element.shield.height, 9)
+        for size in ('0', 'eval(prop("missing"))'):
+            with self.subTest(size=size):
+                override = f'line|z15[highway=tertiary]::label {{ shield-font-size: {size}; }}'
+                [element] = self.compile_classifier_style(css + override)
+                self.assertFalse(element.shield._is_set())
+
+    def test_invalid_shield_size_preserves_outputs(self):
+        for size in ('-1', 'large', '2147483648'):
+            with self.subTest(size=size):
+                self.compile_classifier_style(
+                    f'line|z15[highway=tertiary] {{ width: 2; shield-font-size: {size}; }}',
+                    error=f'Invalid shield-font-size {size!r} for highway-tertiary at z15')
 
     def matching_lines(self, elements, *types, named=False, population=0):
         def matches(guard):
