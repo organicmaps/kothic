@@ -122,6 +122,25 @@ line|z15[highway=tertiary]::label { shield-color: #ffffff; shield-font-size: 9; 
                     f'line|z15[highway=tertiary] {{ width: 2; shield-font-size: {size}; }}',
                     error=f'Invalid shield-font-size {size!r} for highway-tertiary at z15')
 
+    def test_casing_width_cap_join_and_priority(self):
+        [element] = self.compile_classifier_style("""
+line|z15[highway=tertiary] { width: 4; casing-width-add: 1; casing-linecap: round; casing-linejoin: bevel; }
+line|z15[highway=tertiary]::outer { casing-width: 1; casing-width-add: 7; casing-linecap: round; }
+""")
+        self.assertEqual([(line.width, line.cap, line.join, line.priority) for line in element.lines], [
+            (10, drules.ROUNDCAP, drules.BEVELJOIN, 99),
+            (4, drules.BUTTCAP, drules.ROUNDJOIN, 100),
+            (6, drules.ROUNDCAP, drules.ROUNDJOIN, 110),
+        ])
+
+    def test_invalid_caps_and_joins_preserve_outputs(self):
+        for key, value in [('linecap', 'square'), ('linejoin', 'typo'),
+                           ('casing-linecap', 'square'), ('casing-linejoin', 'typo')]:
+            with self.subTest(key=key):
+                self.compile_classifier_style(
+                    f'line|z15[highway=tertiary]::outer {{ width: 4; casing-width: 1; {key}: {value}; }}',
+                    error=f'Unsupported {key} {value!r} for highway-tertiary::outer at z15')
+
     def matching_lines(self, elements, *types, named=False, population=0):
         def matches(guard):
             if guard in ('name', '!name'):
