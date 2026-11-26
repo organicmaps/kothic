@@ -274,6 +274,8 @@ class MapCSS():
                             had_main_tag = False
                         cond = CONDITION.match(css).groups()[0]
                         c = parseCondition(cond)
+                        if c.params[0] == 'name' and c.type not in ('set', 'unset'):
+                            raise ValueError("The 'name' selector only supports [name] and [!name]")
                         tag = c.extract_tag()
                         tag_type = static_tags.get(c.params[0])
                         if (tag_type and had_main_tag) or (c.params[0] == 'extra_tag' and 'extra_tag' in dynamic_tags):

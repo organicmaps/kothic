@@ -102,6 +102,12 @@ class LibKomwmTest(unittest.TestCase):
             entry = next(entry for entry in rules.cont if entry.name == type_name)
             return [element for element in entry.element if element.scale == 15]
 
+    def test_name_selector_rejects_value_comparisons(self):
+        for condition in ('name=Broadway', 'name!=Broadway', 'name>Broadway'):
+            with self.subTest(condition=condition):
+                self.compile_classifier_style(f'line|z15[highway=tertiary][{condition}] {{width: 3;}}',
+                                              error="The 'name' selector only supports")
+
     def test_shield_font_size_override(self):
         css = """
 line|z15[highway=tertiary] { width: 1; color: #000000; }
