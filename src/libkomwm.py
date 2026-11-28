@@ -681,6 +681,8 @@ def komap_mapswithme(options):
     for results in imapfunc(query_style, ((cl, classificator[cl], options.minzoom, options.maxzoom) for cl in class_order)):
         for result in results:
                 cl, zoom, runtime_conditions, zstyle = result
+                if runtime_conditions and (cl == 'isoline' or cl.startswith('isoline-')):
+                    raise ValueError(f'Runtime selectors are not supported for contours: {cl} at z{zoom}')
 
                 # First, sort rules by ::object-id in captions (primary, secondary, none ..)
                 # then by other ::object-id in ascending order.
@@ -710,7 +712,7 @@ def komap_mapswithme(options):
                     dr_cont = ClassifElement()
                     dr_cont.name = cl
 
-                    visstring = ["0"] * (options.maxzoom - options.minzoom + 1)
+                    visstring = ["0"] * (options.maxzoom + 1)
 
                 if len(zstyle) == 0:
                     continue
