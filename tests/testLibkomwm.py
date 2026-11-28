@@ -65,17 +65,18 @@ class LibKomwmTest(unittest.TestCase):
                          'visibility.txt', 'style_output.bin', 'style_output.txt'):
                 self.assertEqual((default / name).read_bytes(), (serial / name).read_bytes(), name)
 
-    def compile_classifier_style(self, css, error=None, type_name='highway-tertiary'):
+    def compile_classifier_style(self, css, error=None, type_name='highway-tertiary', min_zoom=0):
         with TemporaryDirectory() as tmp:
             directory = Path(tmp)
             (directory / 'style.mapcss').write_text(css, encoding='utf-8')
             (directory / 'mapcss-dynamic.txt').write_text('name\npopulation\nbbox_area\nextra_tag\n', encoding='utf-8')
             (directory / 'mapcss-mapping.csv').write_text(
                 'highway|tertiary;1;\nhwtag|oneway;2;\nhwtag|lit;3;\nhighway|path|bicycle;4;\n'
-                'natural|land;5;\nrailway|rail;6;\n', encoding='utf-8')
+                'natural|land;5;\nrailway|rail;6;\n'
+                + ('isoline;7;\nisoline|step_100;8;\n' if '[isoline' in css else ''), encoding='utf-8')
             priorities = {
                 'FG': 'highway-tertiary\nhighway-path-bicycle\nrailway-rail\nhwtag-oneway\nhwtag-lit\nnatural-land\n'
-                      '=== 100\n'
+                      'isoline\nisoline-step_100\n=== 100\n'
                       'highway-tertiary::outer\n=== 110\nhighway-tertiary::stripe\n=== 120\n',
                 'overlays': 'highway-tertiary::label\n=== 100\n',
                 'BG-by-size': 'natural-land\n=== 100\n',
@@ -91,16 +92,35 @@ class LibKomwmTest(unittest.TestCase):
                 output.with_suffix('.bin').write_bytes(b'existing rules')
                 original = {p.name: p.read_bytes() for p in directory.iterdir()}
             run = subprocess.run([sys.executable, libkomwm.__file__, '-s', str(directory / 'style.mapcss'),
-                                  '-o', str(output), '-d', tmp, '-p', tmp, '-t', '15'], capture_output=True, text=True)
+                                  '-o', str(output), '-d', tmp, '-p', tmp, '-f', str(min_zoom), '-t', '15'],
+                                 capture_output=True, text=True)
             if error is not None:
                 self.assertNotEqual(run.returncode, 0, run.stdout + run.stderr)
                 self.assertIn(error, run.stderr)
                 self.assertEqual({p.name: p.read_bytes() for p in directory.iterdir()}, original)
                 return
             self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+            if min_zoom == 15:
+                visibility = (directory / 'visibility.txt').read_text(encoding='utf-8')
+                self.assertIn(['tertiary', '0' * 15 + '1'], [line.split()[:2] for line in visibility.splitlines()])
             rules = drules.load_container(output.with_suffix('.bin'))
             entry = next(entry for entry in rules.cont if entry.name == type_name)
             return [element for element in entry.element if element.scale == 15]
+
+    def test_single_zoom_visibility(self):
+        self.compile_classifier_style('line|z15[highway=tertiary] {width: 2;}', min_zoom=15)
+
+    def test_invalid_numeric_runtime_comparisons(self):
+        for guard in ('population>=', 'population=2.5', 'population=18446744073709551616', 'bbox_area<='):
+            with self.subTest(guard=guard):
+                self.compile_classifier_style(f'line|z15[highway=tertiary][{guard}] {{width: 3;}}',
+                                              error='Invalid numeric runtime selector')
+
+    def test_contour_runtime_guard_is_rejected(self):
+        self.compile_classifier_style('line|z15[isoline] {width: 1;}\n'
+                                      'line|z15[isoline][extra_tag=isoline=step_100] {width: 3;}',
+                                      error='Runtime selectors are not supported for contours')
+        self.compile_classifier_style('line|z15[isoline=step_100] {width: 3;}', type_name='isoline-step_100')
 
     def test_name_selector_rejects_value_comparisons(self):
         for condition in ('name=Broadway', 'name!=Broadway', 'name>Broadway'):

@@ -18,6 +18,7 @@
 import re
 import os
 import logging
+import math
 from .StyleChooser import StyleChooser
 from .Condition import Condition
 
@@ -288,6 +289,22 @@ class MapCSS():
                             if tag_type:
                                 had_main_tag = True
                         elif tag in dynamic_tags:
+                            if tag in ('population', 'bbox_area') and c.type not in ('set', 'unset'):
+                                value = c.params[1].strip() if len(c.params) > 1 else ''
+                                valid = c.type in ('eq', 'ne', '<', '<=', '>', '>=')
+                                if tag == 'population':
+                                    digits = value.lstrip('0')
+                                    valid = (valid and value.isascii() and value.isdecimal()
+                                             and (len(digits) < 20 or
+                                                  (len(digits) == 20 and digits <= '18446744073709551615')))
+                                else:
+                                    try:
+                                        number = float(value)
+                                        valid = valid and '_' not in value and math.isfinite(number) and number >= 0
+                                    except ValueError:
+                                        valid = False
+                                if not valid:
+                                    raise ValueError(f'Invalid numeric runtime selector [{cond}]')
                             sc.addRuntimeCondition(c)
                         else:
                             raise Exception("Unknown tag '" + tag + "' in condition " + cond)
